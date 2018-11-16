@@ -1,0 +1,63 @@
+Exporter version: 5.6.4, Blender version: 2.79 (sub 0)
+========= Conversion from Blender to Babylon.js =========
+	Scene settings used :
+		export scope        :  ALL
+		inline textures     :  false
+		Positions Precision :  4
+		Normals Precision   :  3
+		UVs Precision       :  3
+		Vert Color Precision:  3
+		Mat Weight Precision:  2
+		texture directory   :  /home/duncan/Working/game/src/scenes/
+	Python World class constructor completed
+	processing begun of skeleton:  Armature, id:  0
+		processing begun of bone:  leg.rear.foot.r, index:  0
+		processing begun of bone:  spine.tail.pointer, index:  1
+		processing begun of bone:  spine.lower, index:  2
+		processing begun of bone:  spine.point, index:  3
+		processing begun of bone:  spine.upper, index:  4
+		processing begun of bone:  spine.neck, index:  5
+		processing begun of bone:  spine.head, index:  6
+		processing begun of bone:  leg.rear.upper.r, index:  7
+		processing begun of bone:  leg.rear.mid.r, index:  8
+		processing begun of bone:  leg.rear.lower.r, index:  9
+		processing begun of bone:  spine.tail1, index:  10
+		processing begun of bone:  spine.tail2, index:  11
+		processing begun of bone:  leg.rear.foot.l, index:  12
+		processing begun of bone:  leg.rear.upper.l, index:  13
+		processing begun of bone:  leg.rear.mid.l, index:  14
+		processing begun of bone:  leg.rear.lower.l, index:  15
+		processing begun of bone:  leg.front.foot.pointing.l, index:  16
+		processing begun of bone:  leg.front.foot.l, index:  17
+		processing begun of bone:  leg.front.upper.l, index:  18
+		processing begun of bone:  leg.front.mid.l, index:  19
+		processing begun of bone:  leg.front.lower.l, index:  20
+		processing begun of bone:  leg.front.foot.pointing.r, index:  21
+		processing begun of bone:  leg.front.foot.r, index:  22
+		processing begun of bone:  leg.front.upper.r, index:  23
+		processing begun of bone:  leg.front.mid.r, index:  24
+		processing begun of bone:  leg.front.lower.r, index:  25
+		processing action ArmatureAction:  in[1 - 61], out[0 - 61]
+	processing begun of camera (UniversalCamera):  Camera
+	processing begun of mesh:  body
+		processing begun of Standard material:  red
+		processing begun of Standard material:  white
+		processing begun of Standard material:  black
+		processing begun of multimaterial:  fox.Multimaterial#0
+		num positions      :  539
+		num normals        :  539
+		num uvs            :  0
+		num uvs2           :  0
+		num colors         :  0
+		num indices        :  2952
+		Skeleton stats:  
+			Total Influencers:  598
+			Avg # of influencers per vertex:  1.1095
+			Highest # of influencers observed:  2, num vertices with this:  59
+			exported as 2 influencers
+			num skeletonWeights and skeletonIndices:  2156
+	processing begun of light (POINT):  Lamp
+========= Writing of scene file started =========
+========= Writing of scene file completed =========
+========= end of processing =========
+elapsed time:  0 min, 0.3017 secs

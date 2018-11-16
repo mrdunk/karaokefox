@@ -1,0 +1,1 @@
+./node_modules/.bin/tsc src/game.ts src/3rdParty/babylon.d.ts
