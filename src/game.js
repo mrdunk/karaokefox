@@ -25,7 +25,8 @@ var Character = /** @class */ (function () {
             this.position = this._mesh.position;
             this.rotation = this._mesh.rotation;
             this._mesh.scaling = new BABYLON.Vector3(SCALE, SCALE, SCALE);
-            this._mesh.receiveShadows = true;
+            //this._mesh.receiveShadows = true;
+            //this._mesh.convertToFlatShadedMesh();
             if (this._shaddows) {
                 this._shaddows.getShadowMap().renderList.push(this._mesh);
             }
@@ -103,10 +104,13 @@ var Game = /** @class */ (function () {
     }
     Game.prototype.createScene = function () {
         var _this = this;
+        BABYLON.SceneLoader.CleanBoneMatrixWeights = true;
         this._scene = new BABYLON.Scene(this._engine);
         this._scene.ambientColor = new BABYLON.Color3(0.3, 0.3, 0.3);
         this._light = new BABYLON.DirectionalLight("dir01", new BABYLON.Vector3(0, -0.5, -1.0), this._scene);
         this._light.position = new BABYLON.Vector3(20, 150, 70);
+        var sun = BABYLON.MeshBuilder.CreateSphere("sun", {}, this._scene);
+        sun.position = this._light.position;
         this._camera = new BABYLON.ArcRotateCamera("Camera", 0, 0, 10, new BABYLON.Vector3(0, 30, 0), this._scene);
         this._camera.setPosition(new BABYLON.Vector3(20, 70, 120));
         this._camera.minZ = 10;
@@ -127,6 +131,7 @@ var Game = /** @class */ (function () {
         debugBase.receiveShadows = true;
         // Moving ball for the fox to watch.
         var targetHead = BABYLON.MeshBuilder.CreateSphere("targetHead", {}, this._scene);
+        targetHead.position = this._camera.position.clone();
         shadowGenerator.getShadowMap().renderList.push(targetHead);
         var fox = new Character(this._scene, shadowGenerator, FOX, function () {
             console.log("fox loaded");
@@ -134,26 +139,36 @@ var Game = /** @class */ (function () {
             fox.lookAt(targetHead.position);
             fox.rotation.y = Math.PI;
         });
-        var t1 = 0;
-        var t2 = 0;
-        var t3 = 1;
-        var t4 = 0;
-        var interval = setInterval(function () {
-            t1 += .02;
-            t2 += .03;
-            t3 += .001;
-            t4 += .02;
-            targetHead.position.x = 20 * Math.sin(t1);
-            targetHead.position.y = 44 + 20 * Math.sin(t2);
-            targetHead.position.z = 50;
-            if (fox.rotation) {
-                fox.rotation.y = Math.PI * t3;
+        /*let t1 = 0;
+        let t2 = 0;
+        let t3 = 1;
+        let t4 = 0;
+        let interval = setInterval( () => {
+          t1 += .02;
+          t2 += .03;
+          t3 += .001;
+          t4 += .02;
+    
+          targetHead.position.x = 20 * Math.sin(t1);
+          targetHead.position.y = 44 + 20 * Math.sin(t2);
+          targetHead.position.z = 50;
+    
+          if(fox.rotation) {
+            fox.rotation.y = Math.PI * t3;
+          }
+          if(fox.position) {
+            fox.position.x = 20 * Math.sin(t4);
+            fox.position.z = 20 * Math.cos(t4);
+          }
+        }, 50);*/
+        this._scene.onPointerDown = function (evt, pickResult) {
+            // if the click hits the ground object, we change the impact position
+            if (pickResult.hit) {
+                targetHead.position.x = pickResult.pickedPoint.x;
+                targetHead.position.y = pickResult.pickedPoint.y;
+                targetHead.position.z = pickResult.pickedPoint.z;
             }
-            if (fox.position) {
-                fox.position.x = 20 * Math.sin(t4);
-                fox.position.z = 20 * Math.cos(t4);
-            }
-        }, 50);
+        };
     };
     Game.prototype.doRender = function () {
         var _this = this;

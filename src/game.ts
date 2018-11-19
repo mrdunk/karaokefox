@@ -6,6 +6,7 @@ let FOX = "fox.babylon";
 // let FOX = "skull.babylon";
 let SCALE = 100;
 
+
 class Character {
   private _scene: BABYLON.Scene;
   private _shaddows: BABYLON.ShadowGenerator;
@@ -49,6 +50,7 @@ class Character {
       this.rotation = this._mesh.rotation;
       this._mesh.scaling = new BABYLON.Vector3(SCALE, SCALE, SCALE);
       //this._mesh.receiveShadows = true;
+      //this._mesh.convertToFlatShadedMesh();
 
       if(this._shaddows) {
         this._shaddows.getShadowMap().renderList.push(this._mesh);
@@ -157,11 +159,15 @@ class Game {
   }
 
   createScene() : void {
+    BABYLON.SceneLoader.CleanBoneMatrixWeights = true;
     this._scene = new BABYLON.Scene(this._engine);
     this._scene.ambientColor = new BABYLON.Color3(0.3, 0.3, 0.3);
 
-    this._light = new BABYLON.DirectionalLight("dir01", new BABYLON.Vector3(0, -0.5, -1.0), this._scene);
+    this._light = new BABYLON.DirectionalLight(
+      "dir01", new BABYLON.Vector3(0, -0.5, -1.0), this._scene);
     this._light.position = new BABYLON.Vector3(20, 150, 70);
+    let sun = BABYLON.MeshBuilder.CreateSphere("sun", {}, this._scene);
+    sun.position = this._light.position;
 
     this._camera = new BABYLON.ArcRotateCamera("Camera", 0, 0, 10, new BABYLON.Vector3(0, 30, 0), this._scene);
     this._camera.setPosition(new BABYLON.Vector3(20, 70, 120));
@@ -186,6 +192,7 @@ class Game {
     debugBase.receiveShadows = true;
     // Moving ball for the fox to watch.
     let targetHead = BABYLON.MeshBuilder.CreateSphere("targetHead", {}, this._scene);
+    targetHead.position = this._camera.position.clone();
     shadowGenerator.getShadowMap().renderList.push(targetHead);
     
     let fox = new Character(this._scene, shadowGenerator, FOX, () => {
@@ -195,7 +202,7 @@ class Game {
       fox.rotation.y = Math.PI;
     });
 
-    let t1 = 0;
+    /*let t1 = 0;
     let t2 = 0;
     let t3 = 1;
     let t4 = 0;
@@ -216,7 +223,16 @@ class Game {
         fox.position.x = 20 * Math.sin(t4);
         fox.position.z = 20 * Math.cos(t4);
       }
-    }, 50);
+    }, 50);*/
+
+    this._scene.onPointerDown = function (evt, pickResult) {
+        // if the click hits the ground object, we change the impact position
+        if (pickResult.hit) {
+            targetHead.position.x = pickResult.pickedPoint.x;
+            targetHead.position.y = pickResult.pickedPoint.y;
+            targetHead.position.z = pickResult.pickedPoint.z;
+        }
+    };
   }
 
   doRender() : void {
