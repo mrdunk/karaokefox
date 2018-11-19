@@ -12,7 +12,6 @@ var Character = /** @class */ (function () {
         this._onLoaded = onLoaded;
         this._bones = {};
         this._lookAtNeck = new BABYLON.Vector3(0, 0, 0);
-        this.ahead = new BABYLON.Vector3(0, 0, 0);
         BABYLON.SceneLoader.ImportMesh("", SCENEPATH, filename, this._scene, this.onSceneLoad.bind(this));
     }
     Character.prototype.onSceneLoad = function (meshes, particleSystems, skeletons) {
@@ -26,6 +25,7 @@ var Character = /** @class */ (function () {
             this.position = this._mesh.position;
             this.rotation = this._mesh.rotation;
             this._mesh.scaling = new BABYLON.Vector3(SCALE, SCALE, SCALE);
+            this._mesh.receiveShadows = true;
             if (this._shaddows) {
                 this._shaddows.getShadowMap().renderList.push(this._mesh);
             }
@@ -34,13 +34,16 @@ var Character = /** @class */ (function () {
             skeletonViewer.color = BABYLON.Color3.Red(); // Change default color from white to red
             for (var index = 0; index < this._skeleton.bones.length; index++) {
                 var bone = skeletons[0].bones[index];
-                // console.log(bone.uniqueId, bone.id);
+                console.log(bone.uniqueId, bone.id);
                 switch (bone.id) {
                     case "spine.head":
                         this._bones.head = bone;
                         break;
                     case "spine.neck":
-                        this._bones["neck"] = bone;
+                        this._bones.neck = bone;
+                        break;
+                    case "spine.upper":
+                        this._bones.spineupper = bone;
                         break;
                 }
             }
@@ -60,13 +63,8 @@ var Character = /** @class */ (function () {
             if (this._onLoaded) {
                 this._onLoaded();
             }
-            this._lookCtrlHead = new BABYLON.BoneLookController(this._mesh, this._bones.head, this._lookAt, { adjustPitch: Math.PI * .5 });
-            /*this._lookCtrlNeck = new BABYLON.BoneLookController(
-              this._mesh,
-              this._bones.neck,
-              this._lookAtNeck,
-              {adjustPitch:Math.PI*.5}
-            );*/
+            this._lookCtrlHead = new BABYLON.BoneLookController(this._mesh, this._bones.head, this._lookAt, { adjustPitch: Math.PI / 2 });
+            this._lookCtrlNeck = new BABYLON.BoneLookController(this._mesh, this._bones.neck, this._lookAtNeck, { adjustPitch: Math.PI / 2 });
         }
         catch (error) {
             // Prevent error messages in this section getting swallowed by Babylon.
@@ -75,26 +73,24 @@ var Character = /** @class */ (function () {
     };
     Character.prototype.lookAt = function (target) {
         this._lookAt = target;
-        //var localPos1 = new BABYLON.Vector3(0, 10, 20);;
         this._scene.registerBeforeRender(function () {
-            // TODO Can we optimise here? We probably copy more often than required.
-            var neck = this._bones.neck;
-            //let neckPosWorld = neck.getPosition(BABYLON.Space.WORLD, this._mesh);
-            //let neckPosWorld = neck.getAbsolutePosition(this._mesh);
-            //let targetDistance = BABYLON.Vector3.Distance(neckPosWorld, this._lookAt);
-            //let neckPosLocal = neck.getLocalPositionFromAbsolute(neckPosWorld, this.mesh);
-            var neckPosLocal = new BABYLON.Vector3(0, 44, 23);
-            //this.ahead = neck.getAbsolutePositionFromLocal(new BABYLON.Vector3(neckPosLocal.x, neckPosLocal.y - targetDistance, neckPosLocal.z), this.mesh);
-            //this.ahead = neck.getAbsolutePositionFromLocal(new BABYLON.Vector3(neckPosLocal.x, 100, neckPosLocal.z), this.mesh);
-            neck.getAbsolutePositionFromLocalToRef(neckPosLocal, this._mesh, this.ahead);
-            //this.ahead = this._skeleton.bones[0].getAbsolutePositionFromLocal(localPos1, this._mesh);
-            //console.log(neckPosWorld, ahead, targetDistance);
-            console.log(this.ahead);
-            //this._lookAtNeck.x = (this.ahead.x + this._lookAt.x) / 2;
-            //this._lookAtNeck.y = (this.ahead.y + this._lookAt.y) / 2;
-            //this._lookAtNeck.z = (this.ahead.z + this._lookAt.z) / 2;
-            //this._lookCtrlNeck.update();
-            this._lookCtrlHead.update();
+            // The neck should pint half way between straight forward and the
+            // direction the head is pointing.
+            var spineUpper = this._bones.spineupper;
+            var targetLocal = spineUpper.getLocalPositionFromAbsolute(target, this._mesh);
+            var targetLocalXY = new BABYLON.Vector3(targetLocal.x, targetLocal.y, 0);
+            var targetLocalYZ = new BABYLON.Vector3(0, targetLocal.y, targetLocal.z);
+            var aheadLocal = new BABYLON.Vector3(0, targetLocal.length(), 0); // (l/r, f/b, u/d)
+            var angleXY = BABYLON.Vector3.GetAngleBetweenVectors(targetLocalXY, aheadLocal, new BABYLON.Vector3(0, 0, 1));
+            var angleYZ = BABYLON.Vector3.GetAngleBetweenVectors(targetLocalYZ, aheadLocal, new BABYLON.Vector3(-1, 0, 0));
+            var lookAtNeckLocal = new BABYLON.Vector3(Math.sin(angleXY / 2) * targetLocalXY.length(), (Math.cos(angleXY / 2) * targetLocalXY.length() +
+                Math.cos(angleYZ / 2) * targetLocalYZ.length()) / 2, Math.sin(angleYZ / 2) * targetLocalYZ.length());
+            spineUpper.getAbsolutePositionFromLocalToRef(lookAtNeckLocal, this._mesh, this._lookAtNeck);
+            if (angleXY > -Math.PI / 2 && angleXY < Math.PI / 2 && angleYZ > -Math.PI / 2 && angleYZ < Math.PI / 2) {
+                // Only look at thing if it's not behind us.
+                this._lookCtrlNeck.update();
+                this._lookCtrlHead.update();
+            }
         }.bind(this));
     };
     return Character;
@@ -126,10 +122,12 @@ var Game = /** @class */ (function () {
         // Shadows
         var shadowGenerator = new BABYLON.ShadowGenerator(1024, this._light);
         // Meshes
-        var debugBase = BABYLON.MeshBuilder.CreateBox("debugBase", { height: 5, width: 50, depth: 100 }, this._scene);
+        // World positions: (l/r, u/d, f/b)
+        var debugBase = BABYLON.MeshBuilder.CreateBox("debugBase", { height: 1, width: 50, depth: 100 }, this._scene);
+        debugBase.receiveShadows = true;
         // Moving ball for the fox to watch.
         var targetHead = BABYLON.MeshBuilder.CreateSphere("targetHead", {}, this._scene);
-        var targetNeck = BABYLON.MeshBuilder.CreateSphere("targetNeck", { diameterX: 10, diameterY: 10, diameterZ: 10 }, this._scene);
+        shadowGenerator.getShadowMap().renderList.push(targetHead);
         var fox = new Character(this._scene, shadowGenerator, FOX, function () {
             console.log("fox loaded");
             _this._camera.target = fox.position;
@@ -139,20 +137,21 @@ var Game = /** @class */ (function () {
         var t1 = 0;
         var t2 = 0;
         var t3 = 1;
+        var t4 = 0;
         var interval = setInterval(function () {
             t1 += .02;
             t2 += .03;
             t3 += .001;
+            t4 += .02;
             targetHead.position.x = 20 * Math.sin(t1);
             targetHead.position.y = 44 + 20 * Math.sin(t2);
             targetHead.position.z = 50;
-            if (fox.ahead) {
-                targetNeck.position.x = fox.ahead.x;
-                targetNeck.position.y = fox.ahead.y;
-                targetNeck.position.z = fox.ahead.z;
-            }
             if (fox.rotation) {
                 fox.rotation.y = Math.PI * t3;
+            }
+            if (fox.position) {
+                fox.position.x = 20 * Math.sin(t4);
+                fox.position.z = 20 * Math.cos(t4);
             }
         }, 50);
     };
