@@ -27,17 +27,16 @@ Exporter version: 5.6.4, Blender version: 2.79 (sub 0)
 		processing begun of bone:  leg.rear.upper.l, index:  13
 		processing begun of bone:  leg.rear.mid.l, index:  14
 		processing begun of bone:  leg.rear.lower.l, index:  15
-		processing begun of bone:  leg.front.foot.pointing.l, index:  16
-		processing begun of bone:  leg.front.foot.l, index:  17
-		processing begun of bone:  leg.front.upper.l, index:  18
-		processing begun of bone:  leg.front.mid.l, index:  19
-		processing begun of bone:  leg.front.lower.l, index:  20
-		processing begun of bone:  leg.front.foot.pointing.r, index:  21
-		processing begun of bone:  leg.front.foot.r, index:  22
-		processing begun of bone:  leg.front.upper.r, index:  23
-		processing begun of bone:  leg.front.mid.r, index:  24
-		processing begun of bone:  leg.front.lower.r, index:  25
-		processing action ArmatureAction:  in[1 - 61], out[0 - 61]
+		processing begun of bone:  leg.front.foot.l, index:  16
+		processing begun of bone:  leg.front.upper.l, index:  17
+		processing begun of bone:  leg.front.mid.l, index:  18
+		processing begun of bone:  leg.front.lower.l, index:  19
+		processing begun of bone:  leg.front.foot.r, index:  20
+		processing begun of bone:  leg.front.upper.r, index:  21
+		processing begun of bone:  leg.front.mid.r, index:  22
+		processing begun of bone:  leg.front.lower.r, index:  23
+		processing action ArmatureAction:  in[0 - 1], out[0 - 1]
+		processing action ArmatureAction.001:  in[8 - 43], out[10 - 53]
 	processing begun of camera (UniversalCamera):  Camera
 	processing begun of mesh:  body
 		processing begun of Standard material:  red
@@ -51,13 +50,13 @@ Exporter version: 5.6.4, Blender version: 2.79 (sub 0)
 		num colors         :  0
 		num indices        :  2952
 		Skeleton stats:  
-			Total Influencers:  598
-			Avg # of influencers per vertex:  1.1095
-			Highest # of influencers observed:  2, num vertices with this:  59
+			Total Influencers:  614
+			Avg # of influencers per vertex:  1.1391
+			Highest # of influencers observed:  2, num vertices with this:  75
 			exported as 2 influencers
 			num skeletonWeights and skeletonIndices:  2156
 	processing begun of light (POINT):  Lamp
 ========= Writing of scene file started =========
 ========= Writing of scene file completed =========
 ========= end of processing =========
-elapsed time:  0 min, 0.284 secs
+elapsed time:  0 min, 0.3666 secs
