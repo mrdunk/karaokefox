@@ -12,6 +12,7 @@ var Character = /** @class */ (function () {
         this._onLoaded = onLoaded;
         this._bones = {};
         this._lookAtNeck = new BABYLON.Vector3(0, 0, 0);
+        this._animations = {};
         BABYLON.SceneLoader.ImportMesh("", SCENEPATH, filename, this._scene, this.onSceneLoad.bind(this));
     }
     Character.prototype.onSceneLoad = function (meshes, particleSystems, skeletons) {
@@ -60,7 +61,15 @@ var Character = /** @class */ (function () {
                     this._mesh.rotation.z = this.rotation.z;
                 }
             }.bind(this));
-            //this._scene.beginAnimation(this._skeleton, 1, 30, true);
+            // Animations
+            for (var a = 0; a < this._skeleton.getAnimationRanges().length; a++) {
+                this._animations[this._skeleton.getAnimationRanges()[a].name] = this._skeleton.getAnimationRanges()[a];
+            }
+            console.log(this._animations);
+            var walk = this._animations.walk;
+            var crouch = this._animations.crouch;
+            this._scene.beginWeightedAnimation(this._skeleton, walk.from, walk.to, 1, true);
+            // this._scene.beginWeightedAnimation(this._skeleton, crouch.to, crouch.to, 1, true);
             if (this._onLoaded) {
                 this._onLoaded();
             }

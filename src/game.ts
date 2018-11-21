@@ -18,6 +18,7 @@ class Character {
   private _lookAtNeck: BABYLON.Vector3;
   private _lookCtrlHead: BABYLON.BoneLookController;
   private _lookCtrlNeck: BABYLON.BoneLookController;
+  private _animations: {[id: string] : BABYLON.Nullable<BABYLON.AnimationRange>};
 
   position: BABYLON.Vector3;
   rotation: BABYLON.Vector3;
@@ -32,6 +33,7 @@ class Character {
     this._onLoaded = onLoaded;
     this._bones = {};
     this._lookAtNeck = new BABYLON.Vector3(0, 0, 0);
+    this._animations = {};
     BABYLON.SceneLoader.ImportMesh("", SCENEPATH, filename, this._scene, this.onSceneLoad.bind(this));
   }
 
@@ -89,7 +91,16 @@ class Character {
         }
       }.bind(this));
 
-      //this._scene.beginAnimation(this._skeleton, 1, 30, true);
+      // Animations
+      for(let a = 0; a < this._skeleton.getAnimationRanges().length; a++) {
+        this._animations[this._skeleton.getAnimationRanges()[a].name] = this._skeleton.getAnimationRanges()[a];
+      }
+      console.log(this._animations);
+
+      let walk = this._animations.walk;
+      let crouch = this._animations.crouch;
+      this._scene.beginWeightedAnimation(this._skeleton, walk.from, walk.to, 1, true);
+      // this._scene.beginWeightedAnimation(this._skeleton, crouch.to, crouch.to, 1, true);
 
       if(this._onLoaded) {
         this._onLoaded();
