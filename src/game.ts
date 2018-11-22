@@ -75,6 +75,9 @@ class Character {
           case "spine.upper":
             this._bones.spineupper = bone;
             break;
+          case "spine.point":
+            this._bones.headPoint = bone;
+            break;
         }
       }
 
@@ -98,9 +101,11 @@ class Character {
       console.log(this._animations);
 
       let walk = this._animations.walk;
+      //let walkHead = this._animations.walkHead;
       let crouch = this._animations.crouch;
       this._scene.beginWeightedAnimation(this._skeleton, walk.from, walk.to, 1, true);
-      // this._scene.beginWeightedAnimation(this._skeleton, crouch.to, crouch.to, 1, true);
+      //this._scene.beginWeightedAnimation(this._skeleton, walkHead.from, walkHead.to, 1, true);
+      //this._scene.beginWeightedAnimation(this._skeleton, crouch.from, crouch.to, 1, true);
 
       if(this._onLoaded) {
         this._onLoaded();
@@ -149,8 +154,15 @@ class Character {
 
       if(angleXY > -Math.PI / 2 && angleXY < Math.PI / 2 && angleYZ > -Math.PI / 2 && angleYZ < Math.PI / 2) {
         // Only look at thing if it's not behind us.
-        this._lookCtrlNeck.update();
-        this._lookCtrlHead.update();
+        //this._lookCtrlNeck.update();
+        //this._lookCtrlHead.update();
+        this._bones.neck.rotate(BABYLON.Axis.Z, -angleXY / 2, BABYLON.Space.LOCAL);
+        this._bones.neck.rotate(BABYLON.Axis.X, angleYZ / 2, BABYLON.Space.LOCAL);
+        this._bones.head.rotate(BABYLON.Axis.Z, -angleXY / 2, BABYLON.Space.LOCAL);
+        this._bones.head.rotate(BABYLON.Axis.X, angleYZ / 2, BABYLON.Space.LOCAL);
+        //this._bones.neck.rotate(BABYLON.Axis.Y, Math.PI / 4, BABYLON.Space.WORLD);
+        //this._bones.head.rotate(BABYLON.Axis.Y, Math.PI / 4, BABYLON.Space.WORLD);
+        //this._bones.headPoint.rotate(BABYLON.Axis.Y, Math.PI / 4, BABYLON.Space.WORLD);
       }
     }.bind(this));
   }
