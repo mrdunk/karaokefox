@@ -3,7 +3,6 @@
 let SCENEPATH = "scenes/";
 let FOX = "fox.babylon";
 //let FOX = "fox.stl";
-// let FOX = "skull.babylon";
 let SCALE = 100;
 
 
@@ -18,7 +17,10 @@ class Character {
   private _lookAtNeck: BABYLON.Vector3;
   private _lookCtrlHead: BABYLON.BoneLookController;
   private _lookCtrlNeck: BABYLON.BoneLookController;
-  private _animations: {[id: string] : BABYLON.Nullable<BABYLON.AnimationRange>};
+  private _animations: {[id: string] : BABYLON.AnimationRange};
+  private _animationQueue: string[];
+  private _animationCurrent: BABYLON.Animatable;
+  private _animationLast: BABYLON.Animatable;
 
   position: BABYLON.Vector3;
   rotation: BABYLON.Vector3;
@@ -34,6 +36,7 @@ class Character {
     this._bones = {};
     this._lookAtNeck = new BABYLON.Vector3(0, 0, 0);
     this._animations = {};
+    this._animationQueue = [];
     BABYLON.SceneLoader.ImportMesh("", SCENEPATH, filename, this._scene, this.onSceneLoad.bind(this));
   }
 
@@ -58,9 +61,9 @@ class Character {
         this._shaddows.getShadowMap().renderList.push(this._mesh);
       }
 
-      let skeletonViewer = new BABYLON.Debug.SkeletonViewer(this._skeleton, this._mesh, this._scene);
+        /*let skeletonViewer = new BABYLON.Debug.SkeletonViewer(this._skeleton, this._mesh, this._scene);
       skeletonViewer.isEnabled = true; // Enable it
-      skeletonViewer.color = BABYLON.Color3.Red(); // Change default color from white to red
+      skeletonViewer.color = BABYLON.Color3.Red(); // Change default color from white to red*/
 
       for(let index = 0; index < this._skeleton.bones.length; index++) {
         let bone = skeletons[0].bones[index];
@@ -96,20 +99,24 @@ class Character {
 
       // Animations
       for(let a = 0; a < this._skeleton.getAnimationRanges().length; a++) {
-        this._animations[this._skeleton.getAnimationRanges()[a].name] = this._skeleton.getAnimationRanges()[a];
+        let animation = this._skeleton.getAnimationRanges()[a];
+        console.log(a, animation.name);
+        this._animations[animation.name] = this._skeleton.getAnimationRanges()[a];
       }
-      console.log(this._animations);
+      this._animationQueue.push("walk");
+      this.playAnimation();
 
-      let walk = this._animations.walk;
-      //let walkHead = this._animations.walkHead;
-      let crouch = this._animations.crouch;
-      this._scene.beginWeightedAnimation(this._skeleton, walk.from, walk.to, 1, true);
-      //this._scene.beginWeightedAnimation(this._skeleton, walkHead.from, walkHead.to, 1, true);
-      //this._scene.beginWeightedAnimation(this._skeleton, crouch.from, crouch.to, 1, true);
+      setTimeout(function() {
+        console.log("pause stroll.");
+        this._animationQueue.push("stationary");
+        this._animationQueue.push("crouch");
+        this._animationQueue.push("walk");
+      }.bind(this), 5000);
 
-      if(this._onLoaded) {
-        this._onLoaded();
-      }
+      setTimeout(function() {
+        console.log("walk.");
+      }.bind(this), 10000);
+
 
       this._lookCtrlHead = new BABYLON.BoneLookController(
         this._mesh,
@@ -123,6 +130,10 @@ class Character {
         this._lookAtNeck,
         {adjustPitch: Math.PI / 2}
       );
+      if(this._onLoaded) {
+        this._onLoaded();
+      }
+
     } catch(error) {
       // Prevent error messages in this section getting swallowed by Babylon.
       console.error(error);
@@ -145,7 +156,7 @@ class Character {
       let angleXY = BABYLON.Vector3.GetAngleBetweenVectors(targetLocalXY, aheadLocal, new BABYLON.Vector3(0, 0, 1));
       let angleYZ = BABYLON.Vector3.GetAngleBetweenVectors(targetLocalYZ, aheadLocal, new BABYLON.Vector3(-1, 0, 0));
       
-      var lookAtNeckLocal =
+      let lookAtNeckLocal =
         new BABYLON.Vector3(Math.sin(angleXY /2) * targetLocalXY.length(),
                             (Math.cos(angleXY /2) * targetLocalXY.length() +
                              Math.cos(angleYZ /2) * targetLocalYZ.length()) / 2,
@@ -160,10 +171,59 @@ class Character {
         this._bones.neck.rotate(BABYLON.Axis.X, angleYZ / 2, BABYLON.Space.LOCAL);
         this._bones.head.rotate(BABYLON.Axis.Z, -angleXY / 2, BABYLON.Space.LOCAL);
         this._bones.head.rotate(BABYLON.Axis.X, angleYZ / 2, BABYLON.Space.LOCAL);
-        //this._bones.neck.rotate(BABYLON.Axis.Y, Math.PI / 4, BABYLON.Space.WORLD);
-        //this._bones.head.rotate(BABYLON.Axis.Y, Math.PI / 4, BABYLON.Space.WORLD);
-        //this._bones.headPoint.rotate(BABYLON.Axis.Y, Math.PI / 4, BABYLON.Space.WORLD);
       }
+    }.bind(this));
+  }
+
+  playAnimation(animationObservable_?: BABYLON.Observer<BABYLON.Scene>) : void {
+    if(this._animationQueue.length === 0 || this._animationLast) {
+      console.log("nothing to do");
+      return;
+    }
+    console.log(this._animationQueue);
+
+    this._animationLast = this._animationCurrent;
+    let animation = this._animationQueue.shift();
+    this._animationCurrent = this._scene.beginWeightedAnimation(
+      this._skeleton,
+      this._animations[animation].from +2,
+      this._animations[animation].to,
+      0.01,
+      true,
+    );
+
+    // Clean up any previous Observer.
+    this._scene.onBeforeAnimationsObservable.remove(animationObservable_);
+
+    // Create a new Observer.
+    let lastFrameInt: number = 0;
+    let lastFrameFloat: number = 0;
+    let animationObservable = this._scene.onBeforeAnimationsObservable.add(function() {
+      let frameFloat = this._animationCurrent.getAnimations()[0].currentFrame;
+      let frameInt = Math.floor(frameFloat);
+
+      // Once per whole frame
+      // or whenever a new frame starts (to catch single frame animations).
+      if(lastFrameInt !== frameInt || frameFloat < lastFrameFloat) {
+        if(this._animationLast) {
+          this._animationLast.weight -= 0.05;
+          if(this._animationLast.weight <= 0) {
+            this._animationLast.weight = 0;
+            this._animationLast.loopAnimation = false;
+            this._animationLast.stop();
+            this._animationLast = undefined;
+          }
+        }
+        if(this._animationCurrent.weight < 1) {
+          this._animationCurrent.weight += 0.05;
+        }
+
+        if(frameFloat < lastFrameFloat) {
+          this.playAnimation(animationObservable);
+        }
+        lastFrameInt = frameInt;
+      }
+      lastFrameFloat = this._animationCurrent.getAnimations()[0].currentFrame;
     }.bind(this));
   }
 }
@@ -224,29 +284,6 @@ class Game {
       fox.lookAt(targetHead.position);
       fox.rotation.y = Math.PI;
     });
-
-    /*let t1 = 0;
-    let t2 = 0;
-    let t3 = 1;
-    let t4 = 0;
-    let interval = setInterval( () => {
-      t1 += .02;
-      t2 += .03;
-      t3 += .001;
-      t4 += .02;
-
-      targetHead.position.x = 20 * Math.sin(t1);
-      targetHead.position.y = 44 + 20 * Math.sin(t2);
-      targetHead.position.z = 50;
-
-      if(fox.rotation) {
-        fox.rotation.y = Math.PI * t3;
-      }
-      if(fox.position) {
-        fox.position.x = 20 * Math.sin(t4);
-        fox.position.z = 20 * Math.cos(t4);
-      }
-    }, 50);*/
 
     this._scene.onPointerDown = function (evt, pickResult) {
         // if the click hits the ground object, we change the impact position
