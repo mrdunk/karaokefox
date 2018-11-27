@@ -46,21 +46,22 @@ Exporter version: 5.6.4, Blender version: 2.79 (sub 0)
 		processing begun of Standard material:  red
 		processing begun of Standard material:  white
 		processing begun of Standard material:  black
+		processing begun of Standard material:  Material
 		processing begun of multimaterial:  fox.Multimaterial#0
-		num positions      :  543
-		num normals        :  543
+		num positions      :  903
+		num normals        :  903
 		num uvs            :  0
 		num uvs2           :  0
 		num colors         :  0
-		num indices        :  2976
+		num indices        :  4998
 		Skeleton stats:  
-			Total Influencers:  632
-			Avg # of influencers per vertex:  1.1639
-			Highest # of influencers observed:  2, num vertices with this:  89
+			Total Influencers:  1009
+			Avg # of influencers per vertex:  1.1174
+			Highest # of influencers observed:  2, num vertices with this:  106
 			exported as 2 influencers
-			num skeletonWeights and skeletonIndices:  2172
+			num skeletonWeights and skeletonIndices:  3612
 	processing begun of light (POINT):  Lamp
 ========= Writing of scene file started =========
 ========= Writing of scene file completed =========
 ========= end of processing =========
-elapsed time:  0 min, 0.5583 secs
+elapsed time:  0 min, 0.4807 secs

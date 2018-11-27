@@ -2,9 +2,19 @@
 
 let SCENEPATH = "scenes/";
 let FOX = "fox.babylon";
-//let FOX = "fox.stl";
 let SCALE = 100;
+let ANIM_MERGE_RATE = 0.05;
 
+
+interface AnimateRequest {
+  name: string;
+  loop: boolean;
+  reversed: boolean;
+  dirty?: boolean;
+  runCount?: number;
+  animation?: BABYLON.Animatable;
+  cleanup?: boolean;
+}
 
 class Character {
   private _scene: BABYLON.Scene;
@@ -18,9 +28,10 @@ class Character {
   private _lookCtrlHead: BABYLON.BoneLookController;
   private _lookCtrlNeck: BABYLON.BoneLookController;
   private _animations: {[id: string] : BABYLON.AnimationRange};
-  private _animationQueue: string[];
-  private _animationCurrent: BABYLON.Animatable;
-  private _animationLast: BABYLON.Animatable;
+  private _animationQueue: AnimateRequest[];
+  private _animationCurrent: AnimateRequest;
+  private _animationLast: AnimateRequest;
+  private _animationObservable: BABYLON.Observer<BABYLON.Scene>;
 
   position: BABYLON.Vector3;
   rotation: BABYLON.Vector3;
@@ -65,6 +76,7 @@ class Character {
       skeletonViewer.isEnabled = true; // Enable it
       skeletonViewer.color = BABYLON.Color3.Red(); // Change default color from white to red*/
 
+      // Parse all bones and store any we need later for future access.
       for(let index = 0; index < this._skeleton.bones.length; index++) {
         let bone = skeletons[0].bones[index];
         console.log(bone.uniqueId, bone.id);
@@ -84,39 +96,13 @@ class Character {
         }
       }
 
-      this._scene.registerBeforeRender(function () {
-        if(! this.position.equals(this._mesh.position)) {
-          this._mesh.position.x = this.position.x;
-          this._mesh.position.y = this.position.y;
-          this._mesh.position.z = this.position.z;
-        }
-        if(! this.rotation.equals(this._mesh.rotation)) {
-          this._mesh.rotation.x = this.rotation.x;
-          this._mesh.rotation.y = this.rotation.y;
-          this._mesh.rotation.z = this.rotation.z;
-        }
-      }.bind(this));
-
       // Animations
       for(let a = 0; a < this._skeleton.getAnimationRanges().length; a++) {
         let animation = this._skeleton.getAnimationRanges()[a];
         console.log(a, animation.name);
         this._animations[animation.name] = this._skeleton.getAnimationRanges()[a];
       }
-      this._animationQueue.push("walk");
-      this.playAnimation();
-
-      setTimeout(function() {
-        console.log("pause stroll.");
-        this._animationQueue.push("stationary");
-        this._animationQueue.push("crouch");
-        this._animationQueue.push("walk");
-      }.bind(this), 5000);
-
-      setTimeout(function() {
-        console.log("walk.");
-      }.bind(this), 10000);
-
+      this._animationQueue.push({name: "walk", loop: true, reversed: false});
 
       this._lookCtrlHead = new BABYLON.BoneLookController(
         this._mesh,
@@ -130,6 +116,23 @@ class Character {
         this._lookAtNeck,
         {adjustPitch: Math.PI / 2}
       );
+
+      // Periodic updates.
+      this._scene.registerBeforeRender(function () {
+        if(! this.position.equals(this._mesh.position)) {
+          this._mesh.position.x = this.position.x;
+          this._mesh.position.y = this.position.y;
+          this._mesh.position.z = this.position.z;
+        }
+        if(! this.rotation.equals(this._mesh.rotation)) {
+          this._mesh.rotation.x = this.rotation.x;
+          this._mesh.rotation.y = this.rotation.y;
+          this._mesh.rotation.z = this.rotation.z;
+        }
+
+        this._playAnimation();
+      }.bind(this));
+
       if(this._onLoaded) {
         this._onLoaded();
       }
@@ -175,56 +178,139 @@ class Character {
     }.bind(this));
   }
 
-  playAnimation(animationObservable_?: BABYLON.Observer<BABYLON.Scene>) : void {
-    if(this._animationQueue.length === 0 || this._animationLast) {
-      console.log("nothing to do");
+  /* Add animation to the list to be played. */
+  queueAnimation(animateRequest: AnimateRequest) : void {
+    this._animationQueue.push(animateRequest);
+  }
+
+  /* Pull new animations from queue and clean up finished animations.
+   *
+   * When _animationCurrent has ended, check _animationQueue for next animation.
+   * If _animationLast.cleanup is set, stop the animation and delete.
+   */
+  private _playAnimation() : void {
+    if(this._animationLast === undefined && this._animationQueue.length > 0) {
+      this._animationLast = this._animationCurrent;
+      this._animationCurrent = this._animationQueue.shift();
+      console.log("New: " + this._animationCurrent.name);
+      this._animationCurrent.runCount = 0;
+    }
+    this._serviceAnimation(this._animationCurrent, true);
+    this._serviceAnimation(this._animationLast, false);
+
+    if(this._animationLast && this._animationLast.cleanup) {
+      this._animationLast.animation.stop();
+      this._animationLast.animation = undefined;
+      this._animationLast = undefined;
+    }
+  }
+
+  /* Update an AnimateRequest.
+   *
+   * This will be called periodically for any active AnimateRequest.
+   * If it is the first time this is run for an AnimateRequest the animation
+   * will be started and given greater weight each time this method is called
+   * thereafter.
+   * Args:
+   *   animateRequest: The AnimateRequest object to act upon.
+   *   current: If true, the animation weight will be increased with each call
+   *     (to a mavimum value of 1).
+   *     If false, the animation weight will be decreased with each call until
+   *     it reaches 0 at which time the animation will be stopped and 
+   *     AnimateRequest.cleanup will be set.
+   */
+  private _serviceAnimation(animateRequest: AnimateRequest, current: boolean) : void {
+    if(animateRequest === undefined) {
       return;
     }
-    console.log(this._animationQueue);
 
-    this._animationLast = this._animationCurrent;
-    let animation = this._animationQueue.shift();
-    this._animationCurrent = this._scene.beginWeightedAnimation(
-      this._skeleton,
-      this._animations[animation].from +2,
-      this._animations[animation].to,
-      0.01,
-      true,
-    );
+    let weight = animateRequest.runCount ? animateRequest.animation.weight : 0;
+    if(current && weight < 1) {
+      weight += ANIM_MERGE_RATE;
+      weight = Math.min(1, weight);
+    } else if(!current && weight > 0) {
+      weight -= ANIM_MERGE_RATE;
+      weight = Math.max(0, weight);
+    }
 
-    // Clean up any previous Observer.
-    this._scene.onBeforeAnimationsObservable.remove(animationObservable_);
+    if(animateRequest.animation) {
+      animateRequest.animation.weight = weight;
+    }
 
-    // Create a new Observer.
-    let lastFrameInt: number = 0;
-    let lastFrameFloat: number = 0;
-    let animationObservable = this._scene.onBeforeAnimationsObservable.add(function() {
-      let frameFloat = this._animationCurrent.getAnimations()[0].currentFrame;
-      let frameInt = Math.floor(frameFloat);
+    if(weight <= 0) {
+      // This old AnimateRequest has been faded out and needs stopped and removed.
+      animateRequest.cleanup = true;
+      return;
+    }
 
-      // Once per whole frame
-      // or whenever a new frame starts (to catch single frame animations).
-      if(lastFrameInt !== frameInt || frameFloat < lastFrameFloat) {
-        if(this._animationLast) {
-          this._animationLast.weight -= 0.05;
-          if(this._animationLast.weight <= 0) {
-            this._animationLast.weight = 0;
-            this._animationLast.loopAnimation = false;
-            this._animationLast.stop();
-            this._animationLast = undefined;
-          }
-        }
-        if(this._animationCurrent.weight < 1) {
-          this._animationCurrent.weight += 0.05;
-        }
+    if(animateRequest.dirty === false) {
+      // Nothing more to do.
+      // Animations which end set animateRequest.dirty to true when they need
+      // this method to continue past this point.
+      return;
+    }
 
-        if(frameFloat < lastFrameFloat) {
-          this.playAnimation(animationObservable);
-        }
-        lastFrameInt = frameInt;
-      }
-      lastFrameFloat = this._animationCurrent.getAnimations()[0].currentFrame;
-    }.bind(this));
+    console.log(animateRequest.name, weight, current);
+
+
+    if(animateRequest.runCount && !animateRequest.loop && animateRequest.reversed) {
+      // Freeze frame at first frame in sequence.
+      animateRequest.animation.stop();
+      animateRequest.animation = this._scene.beginWeightedAnimation(
+        this._skeleton,
+        this._animations[animateRequest.name].from +2,
+        this._animations[animateRequest.name].from +2,
+        weight,
+        false,
+        0.01,
+        function() {
+          animateRequest.dirty = true;
+        }.bind(this)
+      );
+    } else if(animateRequest.runCount && !animateRequest.loop) {
+      // Freeze frame at last frame in sequence.
+      animateRequest.animation.stop();
+      animateRequest.animation = this._scene.beginWeightedAnimation(
+        this._skeleton,
+        this._animations[animateRequest.name].to,
+        this._animations[animateRequest.name].to,
+        weight,
+        false,
+        0.01,
+        function() {
+          animateRequest.dirty = true;
+        }.bind(this)
+      );
+    } else if(animateRequest.reversed) {
+      // Play an animation in reverse.
+      animateRequest.animation = this._scene.beginWeightedAnimation(
+        this._skeleton,
+        this._animations[animateRequest.name].to,
+        this._animations[animateRequest.name].from +2,
+        weight,
+        false,
+        1,
+        function() {
+          animateRequest.dirty = true;
+        }.bind(this)
+      );
+    } else {
+      // Play an animation.
+      animateRequest.animation = this._scene.beginWeightedAnimation(
+        this._skeleton,
+        this._animations[animateRequest.name].from +2,
+        this._animations[animateRequest.name].to,
+        weight,
+        false,
+        1,
+        function() {
+          animateRequest.dirty = true;
+        }.bind(this)
+      );
+    }
+
+    animateRequest.dirty = false;
+    animateRequest.runCount++;
   }
 }
 
@@ -277,7 +363,7 @@ class Game {
     let targetHead = BABYLON.MeshBuilder.CreateSphere("targetHead", {}, this._scene);
     targetHead.position = this._camera.position.clone();
     shadowGenerator.getShadowMap().renderList.push(targetHead);
-    
+    // Fox
     let fox = new Character(this._scene, shadowGenerator, FOX, () => {
       console.log("fox loaded");
       this._camera.target = fox.position;
@@ -293,6 +379,25 @@ class Game {
             targetHead.position.z = pickResult.pickedPoint.z;
         }
     };
+    
+    setTimeout(function() {
+      console.log("Add animations.");
+      //this._animationQueue.push({name: "stationary", loop: false, reversed: false});
+      fox.queueAnimation({name: "crouch", loop: false, reversed: false});
+      fox.queueAnimation({name: "crouch", loop: false, reversed: true});
+      //this._animationQueue.push({name: "stationary", loop: true, reversed: false});
+    }.bind(this), 10000);
+
+    setTimeout(function() {
+      console.log("Add crouch animation.");
+      fox.queueAnimation({name: "crouch", loop: false, reversed: false});
+      fox.queueAnimation({name: "crouch", loop: false, reversed: true});
+    }.bind(this), 20000);
+
+    setTimeout(function() {
+      console.log("Add walk animation.");
+      fox.queueAnimation({name: "walk", loop: true, reversed: false});
+    }.bind(this), 30000);
   }
 
   doRender() : void {
