@@ -5,6 +5,7 @@
 		<title>Fox out for a walk.</title>
 		<!--- link to the last version of babylon --->
 		<script src="https://preview.babylonjs.com/babylon.js"></script>
+    <script src="3rdParty/QuickTreeGenerator.js"></script>
     <script src="game.js"></script>
 		<style>
 				html, body {
@@ -20,9 +21,17 @@
 						height  : 100%;
 						touch-action: none;
 				}
+        #fpsLabel {
+          position: absolute;
+          right: 20px;
+          top: 20px;
+          color: #999;
+          cursor: default;
+        }
 		</style>
 	</head>
 	<body>
 			<canvas id="renderCanvas"></canvas>
+      <div id="fpsLabel"></>
 	</body>
 </html>

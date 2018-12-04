@@ -3,6 +3,7 @@ var SCENEPATH = "scenes/";
 var FOX = "fox.babylon";
 var SCALE = 100;
 var ANIM_MERGE_RATE = 0.05;
+var SCENERY_RECURSION = 8;
 var Character = /** @class */ (function () {
     function Character(scene, shaddows, filename, onLoaded) {
         console.log("Creating Character from " + filename);
@@ -208,6 +209,145 @@ var Character = /** @class */ (function () {
     };
     return Character;
 }());
+var SceneryCell = /** @class */ (function () {
+    function SceneryCell(coord, value) {
+        this.coord = coord;
+        this.value = value;
+    }
+    SceneryCell.prototype.parentCoordinates = function (depth) {
+        var pX = 0;
+        var pY = 0;
+        for (var bit = depth - 1; bit >= depth - this.coord.recursion + 1; bit--) {
+            var mask = 1 << bit;
+            if (mask & this.coord.x) {
+                pX |= mask;
+            }
+            if (mask & this.coord.y) {
+                pY |= mask;
+            }
+            //console.log(bit, mask, pX, pY);
+        }
+        return { x: pX, y: pY, recursion: this.coord.recursion - 1 };
+    };
+    return SceneryCell;
+}());
+var Scenery = /** @class */ (function () {
+    function Scenery(scene, shaddows, size) {
+        this._scene = scene;
+        this._shaddows = shaddows;
+        this._treeTypes = [];
+        this._treeTypes.push(this._createTree());
+        this._treeTypes.push(this._createTree());
+        this._treeTypes.push(this._createTree());
+        this._treeTypes.push(this._createTree());
+        this._treeTypes.push(this._createTree());
+        this._treeTypes.push(this._createTree());
+        //this._shaddows.getShadowMap().renderList.push(this._treeTypes[this._treeTypes.length -1]);
+        this._sideLen = size;
+        this._sideMagnitude = Math.floor(Math.log(size) / Math.log(2));
+        console.log(this._sideMagnitude);
+        console.assert(Math.pow(2, this._sideMagnitude) === this._sideLen &&
+            Boolean("size not a power of 2."));
+        this._cells = {};
+        for (var p = this._sideMagnitude; p >= 0; p--) {
+            var segmentSize = Math.pow(2, p);
+            var recursion = this._sideMagnitude - p;
+            console.log(p, segmentSize, recursion);
+            for (var x = 0; x < this._sideLen; x += segmentSize) {
+                for (var y = 0; y < this._sideLen; y += segmentSize) {
+                    if (this.getCell({ x: x, y: y, recursion: recursion }) === undefined) {
+                        var pc = this.getCellParent({ x: x, y: y, recursion: recursion });
+                        if (pc === undefined) {
+                            this.setCell({ x: x, y: y, recursion: recursion }, 100);
+                        }
+                        else {
+                            this.setCell({ x: x, y: y, recursion: recursion }, pc.value * (0.5 + Math.random()));
+                        }
+                    }
+                }
+            }
+        }
+        /*for(let recursion = 0; recursion <= this._sideMagnitude; recursion++) {
+        for(let x = 0; x < this._sideLen; x += Math.pow(2, this._sideMagnitude - recursion)) {
+          let line = ""
+          for(let y = 0; y < this._sideLen; y += Math.pow(2, this._sideMagnitude - recursion)) {
+            let cell = this.getCell({x, y, recursion});
+            if(cell === undefined) {
+              line += "|   u";
+            } else if(recursion === this._sideMagnitude) {
+              if(cell.value > 200) {
+                line += "XX";
+              } else if(cell.value > 100) {
+                line += "xx";
+              } else {
+                line += "..";
+              }
+            } else {
+              line += "|" + cell.value.toFixed(2);
+            }
+          }
+          console.log(line);
+        }
+      }*/
+        var trees = [];
+        for (var x = 0; x < this._sideLen; x++) {
+            for (var y = 0; y < this._sideLen; y++) {
+                var cell = this.getCell({ x: x, y: y, recursion: this._sideMagnitude });
+                if (cell.value > 100) {
+                    //let tree = this._treeTypes[0].createInstance(this._treeTypes[0].name + "_" + x + "_" + y);
+                    var treeTypes = this._treeTypes.length;
+                    var tree = this._treeTypes[y % treeTypes].clone(this._treeTypes[y % treeTypes].name + "_" + x + "_" + y);
+                    tree.position.x = (x - this._sideLen / 2 + Math.random()) * 200;
+                    tree.position.y = 0;
+                    tree.position.z = (y - this._sideLen / 2 + Math.random()) * 200;
+                    var scale = cell.value / 20;
+                    tree.scaling = new BABYLON.Vector3(scale, scale, scale);
+                    tree.getChildMeshes(false, function (node) {
+                        //node.position.y /= scale;
+                        return true;
+                    });
+                    trees.push(tree);
+                    this._shaddows.getShadowMap().renderList.push(tree);
+                    console.log(tree);
+                }
+            }
+        }
+        //this._trees = BABYLON.Mesh.MergeMeshes(trees);
+        //this._shaddows.getShadowMap().renderList.push(this._trees);
+    }
+    Scenery.prototype.setCell = function (coord, value) {
+        this._cells["" + coord.x + "," + coord.y + "|" + coord.recursion] = new SceneryCell(coord, value);
+    };
+    Scenery.prototype.getCell = function (coord) {
+        //console.log("getCell", coord);
+        if (coord.recursion === -1) {
+            return this._cells["0,0|0"];
+        }
+        return this._cells["" + coord.x + "," + coord.y + "|" + coord.recursion];
+    };
+    Scenery.prototype.getCellParent = function (coord) {
+        var cell = this.getCell(coord);
+        if (cell === undefined) {
+            return this.getCell(new SceneryCell(coord, -1).parentCoordinates(this._sideMagnitude));
+        }
+        return this.getCell(cell.parentCoordinates(this._sideMagnitude));
+    };
+    Scenery.prototype._createTree = function () {
+        var sizeBranch = 15 + Math.random() * 5;
+        var sizeTrunk = 10 + Math.random() * 5;
+        var radius = 1 + Math.random() * 4;
+        var trunkMaterial = new BABYLON.StandardMaterial("trunk", this._scene);
+        trunkMaterial.diffuseColor = new BABYLON.Color3(0.3 + Math.random() * 0.3, 0.2 + Math.random() * 0.3, 0.2 + Math.random() * 0.2);
+        trunkMaterial.specularColor = BABYLON.Color3.Black();
+        var leafMaterial = new BABYLON.StandardMaterial("leaf", this._scene);
+        leafMaterial.diffuseColor = new BABYLON.Color3(0.4 + Math.random() * 0.2, 0.5 + Math.random() * 0.4, 0.2 + Math.random() * 0.2);
+        leafMaterial.specularColor = BABYLON.Color3.Red();
+        var returnVal = QuickTreeGenerator(sizeBranch, sizeTrunk, radius, trunkMaterial, leafMaterial, this._scene);
+        returnVal.setEnabled(false);
+        return returnVal;
+    };
+    return Scenery;
+}());
 var Game = /** @class */ (function () {
     function Game(canvasElement) {
         // Create canvas and engine.
@@ -226,17 +366,17 @@ var Game = /** @class */ (function () {
         this._camera = new BABYLON.ArcRotateCamera("Camera", 0, 0, 10, new BABYLON.Vector3(0, 30, 0), this._scene);
         this._camera.setPosition(new BABYLON.Vector3(20, 70, 120));
         this._camera.minZ = 10;
-        this._camera.maxZ = 1000;
+        this._camera.maxZ = 10000;
         this._camera.attachControl(this._canvas, true);
         // Ground
-        var ground = BABYLON.Mesh.CreateGround("ground", 1000, 1000, 1, this._scene, false);
+        var ground = BABYLON.Mesh.CreateGround("ground", 10000, 10000, 1, this._scene, false);
         var groundMaterial = new BABYLON.StandardMaterial("ground", this._scene);
         groundMaterial.diffuseColor = new BABYLON.Color3(0.2, 0.2, 0.2);
         groundMaterial.specularColor = new BABYLON.Color3(0, 0, 0);
         ground.material = groundMaterial;
         ground.receiveShadows = true;
         // Shadows
-        var shadowGenerator = new BABYLON.ShadowGenerator(1024, this._light);
+        var shadowGenerator = new BABYLON.ShadowGenerator(2048, this._light);
         // Meshes
         // World positions: (l/r, u/d, f/b)
         var debugBase = BABYLON.MeshBuilder.CreateBox("debugBase", { height: 1, width: 50, depth: 100 }, this._scene);
@@ -252,6 +392,7 @@ var Game = /** @class */ (function () {
             fox.lookAt(targetHead.position);
             fox.rotation.y = Math.PI;
         });
+        var scenery = new Scenery(this._scene, shadowGenerator, 32);
         this._scene.onPointerDown = function (evt, pickResult) {
             // if the click hits the ground object, we change the impact position
             if (pickResult.hit) {
@@ -282,6 +423,8 @@ var Game = /** @class */ (function () {
         // Run the render loop.
         this._engine.runRenderLoop(function () {
             _this._scene.render();
+            var fpsLabel = document.getElementById("fpsLabel");
+            fpsLabel.innerHTML = _this._engine.getFps().toFixed() + " fps";
         });
         // The canvas/window resize event handler.
         window.addEventListener('resize', function () {

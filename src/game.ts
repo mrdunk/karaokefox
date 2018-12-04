@@ -4,7 +4,7 @@ let SCENEPATH = "scenes/";
 let FOX = "fox.babylon";
 let SCALE = 100;
 let ANIM_MERGE_RATE = 0.05;
-
+let SCENERY_RECURSION = 8;
 
 interface AnimateRequest {
   name: string;
@@ -14,6 +14,12 @@ interface AnimateRequest {
   runCount?: number;
   animation?: BABYLON.Animatable;
   cleanup?: boolean;
+}
+
+interface Coord {
+  x: number;
+  y: number;
+  recursion: number;
 }
 
 class Character {
@@ -314,6 +320,175 @@ class Character {
   }
 }
 
+class SceneryCell {
+  coord: Coord;
+  recursion: number;
+  value: number;
+  
+  constructor(coord: Coord, value: number) {
+    this.coord = coord;
+    this.value = value;
+  }
+
+  parentCoordinates(depth: number) : Coord {
+    let pX = 0;
+    let pY = 0;
+    for(let bit = depth -1; bit >= depth - this.coord.recursion +1; bit--) {
+      let mask = 1 << bit;
+      if(mask & this.coord.x) {
+        pX |= mask;
+      }
+      if(mask & this.coord.y) {
+        pY |= mask;
+      }
+      //console.log(bit, mask, pX, pY);
+    }
+
+    return {x: pX, y: pY, recursion: this.coord.recursion -1};
+  }
+}
+
+class Scenery {
+  private _scene: BABYLON.Scene;
+  private _shaddows: BABYLON.ShadowGenerator;
+  private _sideLen: number;
+  private _sideMagnitude: number;
+  private _cells: {[id: string] : SceneryCell};
+  private _treeTypes: BABYLON.Mesh[];
+  private _trees: BABYLON.Mesh;
+
+  constructor(scene: BABYLON.Scene,
+              shaddows: BABYLON.ShadowGenerator,
+              size: number) {
+    this._scene = scene;
+    this._shaddows = shaddows;
+
+    this._treeTypes = [];
+    this._treeTypes.push(this._createTree());
+    this._treeTypes.push(this._createTree());
+    this._treeTypes.push(this._createTree());
+    this._treeTypes.push(this._createTree());
+    this._treeTypes.push(this._createTree());
+    this._treeTypes.push(this._createTree());
+    //this._shaddows.getShadowMap().renderList.push(this._treeTypes[this._treeTypes.length -1]);
+
+    this._sideLen = size;
+    this._sideMagnitude = Math.floor(Math.log(size) / Math.log(2));
+    console.log(this._sideMagnitude);
+    console.assert(Math.pow(2, this._sideMagnitude) === this._sideLen &&
+                   Boolean("size not a power of 2."));
+
+    this._cells = {};
+
+    for(let p = this._sideMagnitude; p >= 0; p--) {
+      let segmentSize = Math.pow(2, p);
+      let recursion = this._sideMagnitude - p;
+      console.log(p, segmentSize, recursion);
+      for(let x = 0; x < this._sideLen; x += segmentSize) {
+        for(let y = 0; y < this._sideLen; y += segmentSize) {
+          if(this.getCell({x, y, recursion}) === undefined) {
+            let pc = this.getCellParent({x, y, recursion});
+            if(pc === undefined) {
+              this.setCell({x, y, recursion}, 100);
+            } else {
+              this.setCell({x, y, recursion}, pc.value * (0.5 + Math.random()));
+            }
+          }
+        }
+      }
+    }
+
+      /*for(let recursion = 0; recursion <= this._sideMagnitude; recursion++) {
+      for(let x = 0; x < this._sideLen; x += Math.pow(2, this._sideMagnitude - recursion)) {
+        let line = ""
+        for(let y = 0; y < this._sideLen; y += Math.pow(2, this._sideMagnitude - recursion)) {
+          let cell = this.getCell({x, y, recursion});
+          if(cell === undefined) {
+            line += "|   u";
+          } else if(recursion === this._sideMagnitude) {
+            if(cell.value > 200) {
+              line += "XX";
+            } else if(cell.value > 100) {
+              line += "xx";
+            } else {
+              line += "..";
+            }
+          } else {
+            line += "|" + cell.value.toFixed(2);
+          }
+        }
+        console.log(line);
+      }
+    }*/
+    let trees = [];
+    for(let x = 0; x < this._sideLen; x++) {
+      for(let y = 0; y < this._sideLen; y++) {
+        let cell = this.getCell({x, y, recursion: this._sideMagnitude});
+        if(cell.value > 100) {
+          //let tree = this._treeTypes[0].createInstance(this._treeTypes[0].name + "_" + x + "_" + y);
+          let treeTypes = this._treeTypes.length;
+          let tree = this._treeTypes[y % treeTypes].clone(
+            this._treeTypes[y % treeTypes].name + "_" + x + "_" + y);
+          tree.position.x = (x - this._sideLen / 2 + Math.random()) * 200 ;
+          tree.position.y = 0;
+          tree.position.z = (y - this._sideLen / 2 + Math.random()) * 200 ;
+          let scale = cell.value / 20;
+          tree.scaling = new BABYLON.Vector3(scale, scale, scale);
+          tree.getChildMeshes(false, (node) => {
+            //node.position.y /= scale;
+            return true;
+          });
+          trees.push(tree);
+          this._shaddows.getShadowMap().renderList.push(tree);
+        }
+      }
+    }
+    //this._trees = BABYLON.Mesh.MergeMeshes(trees);
+    //this._shaddows.getShadowMap().renderList.push(this._trees);
+
+  }
+
+  setCell(coord: Coord, value: number) : void {
+    this._cells["" + coord.x + "," + coord.y + "|" + coord.recursion] = new SceneryCell(coord, value);
+  }
+
+  getCell(coord: Coord) : SceneryCell {
+    //console.log("getCell", coord);
+    if(coord.recursion === -1) {
+      return this._cells["0,0|0"];
+    }
+    return this._cells["" + coord.x + "," + coord.y + "|" + coord.recursion];
+  }
+
+  getCellParent(coord: Coord) : SceneryCell {
+    let cell = this.getCell(coord);
+    if(cell === undefined) {
+      return this.getCell(new SceneryCell(coord, -1).parentCoordinates(this._sideMagnitude));
+    }
+    return this.getCell(cell.parentCoordinates(this._sideMagnitude));
+  }
+
+  _createTree() : BABYLON.Mesh {
+    let sizeBranch = 15 + Math.random() * 5;
+    let sizeTrunk = 10 + Math.random() * 5;
+    let radius = 1 + Math.random() * 4;
+    let trunkMaterial = new BABYLON.StandardMaterial("trunk", this._scene);
+    trunkMaterial.diffuseColor = new BABYLON.Color3(0.3 + Math.random() * 0.3,
+                                                    0.2 + Math.random() * 0.3,
+                                                    0.2 + Math.random() * 0.2);
+    trunkMaterial.specularColor = BABYLON.Color3.Black();
+    let leafMaterial = new BABYLON.StandardMaterial("leaf", this._scene);
+    leafMaterial.diffuseColor = new BABYLON.Color3(0.4 + Math.random() * 0.2,
+                                                   0.5 + Math.random() * 0.4,
+                                                   0.2 + Math.random() * 0.2);
+    leafMaterial.specularColor = BABYLON.Color3.Red();
+    let returnVal = QuickTreeGenerator(
+      sizeBranch, sizeTrunk, radius, trunkMaterial, leafMaterial, this._scene)
+    returnVal.setEnabled(false);
+    return returnVal;
+  }
+}
+
 class Game {
   private _canvas: HTMLCanvasElement;
   private _engine: BABYLON.Engine;
@@ -341,11 +516,11 @@ class Game {
     this._camera = new BABYLON.ArcRotateCamera("Camera", 0, 0, 10, new BABYLON.Vector3(0, 30, 0), this._scene);
     this._camera.setPosition(new BABYLON.Vector3(20, 70, 120));
     this._camera.minZ = 10;
-    this._camera.maxZ = 1000;
+    this._camera.maxZ = 10000;
     this._camera.attachControl(this._canvas, true);
 
     // Ground
-    let ground = BABYLON.Mesh.CreateGround("ground", 1000, 1000, 1, this._scene, false);
+    let ground = BABYLON.Mesh.CreateGround("ground", 10000, 10000, 1, this._scene, false);
     let groundMaterial = new BABYLON.StandardMaterial("ground", this._scene);
     groundMaterial.diffuseColor = new BABYLON.Color3(0.2, 0.2, 0.2);
     groundMaterial.specularColor = new BABYLON.Color3(0, 0, 0);
@@ -353,7 +528,7 @@ class Game {
     ground.receiveShadows = true;
 
     // Shadows
-    let shadowGenerator = new BABYLON.ShadowGenerator(1024, this._light);
+    let shadowGenerator = new BABYLON.ShadowGenerator(2048, this._light);
 
     // Meshes
     // World positions: (l/r, u/d, f/b)
@@ -370,6 +545,9 @@ class Game {
       fox.lookAt(targetHead.position);
       fox.rotation.y = Math.PI;
     });
+
+    let scenery = new Scenery(this._scene, shadowGenerator, 32);
+    
 
     this._scene.onPointerDown = function (evt, pickResult) {
         // if the click hits the ground object, we change the impact position
@@ -404,6 +582,8 @@ class Game {
     // Run the render loop.
     this._engine.runRenderLoop(() => {
       this._scene.render();
+      let fpsLabel = document.getElementById("fpsLabel");
+      fpsLabel.innerHTML = this._engine.getFps().toFixed() + " fps";
     });
 
     // The canvas/window resize event handler.
