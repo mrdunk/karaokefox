@@ -70,7 +70,7 @@ class Character {
 
       this.position = this._mesh.position;
       this.rotation = this._mesh.rotation;
-      this._mesh.scaling = new BABYLON.Vector3(SCALE, SCALE, SCALE);
+      //this._mesh.scaling = new BABYLON.Vector3(SCALE, SCALE, SCALE);
       //this._mesh.receiveShadows = true;
       //this._mesh.convertToFlatShadedMesh();
 
@@ -355,6 +355,7 @@ class Scenery {
   private _sideMagnitude: number;
   private _cells: {[id: string] : SceneryCell};
   private _treeTypes: BABYLON.Mesh[];
+  private _shrubTypes: BABYLON.Mesh[];
   private _trees: BABYLON.Mesh;
 
   constructor(scene: BABYLON.Scene,
@@ -364,13 +365,29 @@ class Scenery {
     this._shaddows = shaddows;
 
     this._treeTypes = [];
+    // Ensure there are always /some/ of each type of tree.
+    this._treeTypes.push(this._createTreePine());
+    this._treeTypes.push(this._createTreeDeciduous());
+    // But most should be random.
     this._treeTypes.push(this._createTree());
     this._treeTypes.push(this._createTree());
     this._treeTypes.push(this._createTree());
     this._treeTypes.push(this._createTree());
     this._treeTypes.push(this._createTree());
     this._treeTypes.push(this._createTree());
-    //this._shaddows.getShadowMap().renderList.push(this._treeTypes[this._treeTypes.length -1]);
+    this._treeTypes.push(this._createTree());
+    this._treeTypes.push(this._createTree());
+    this._treeTypes.push(this._createTree());
+    this._treeTypes.push(this._createTree());
+
+    this._shrubTypes = [];
+    this._shrubTypes.push(this._createShrub());
+    this._shrubTypes.push(this._createShrub());
+    this._shrubTypes.push(this._createShrub());
+    this._shrubTypes.push(this._createShrub());
+    this._shrubTypes.push(this._createShrub());
+    this._shrubTypes.push(this._createShrub());
+    this._shrubTypes.push(this._createShrub());
 
     this._sideLen = size;
     this._sideMagnitude = Math.floor(Math.log(size) / Math.log(2));
@@ -390,6 +407,11 @@ class Scenery {
             let pc = this.getCellParent({x, y, recursion});
             if(pc === undefined) {
               this.setCell({x, y, recursion}, 100);
+            } else if(recursion > 4 &&
+                      x <= this._sideLen / 2 && x >= this._sideLen / 2 - segmentSize &&
+                      y <= this._sideLen / 2 && y >= this._sideLen / 2 - segmentSize) {
+              // Center of map should always be empty.
+              this.setCell({x, y, recursion}, 0);
             } else {
               this.setCell({x, y, recursion}, pc.value * (0.5 + Math.random()));
             }
@@ -397,29 +419,9 @@ class Scenery {
         }
       }
     }
-
-      /*for(let recursion = 0; recursion <= this._sideMagnitude; recursion++) {
-      for(let x = 0; x < this._sideLen; x += Math.pow(2, this._sideMagnitude - recursion)) {
-        let line = ""
-        for(let y = 0; y < this._sideLen; y += Math.pow(2, this._sideMagnitude - recursion)) {
-          let cell = this.getCell({x, y, recursion});
-          if(cell === undefined) {
-            line += "|   u";
-          } else if(recursion === this._sideMagnitude) {
-            if(cell.value > 200) {
-              line += "XX";
-            } else if(cell.value > 100) {
-              line += "xx";
-            } else {
-              line += "..";
-            }
-          } else {
-            line += "|" + cell.value.toFixed(2);
-          }
-        }
-        console.log(line);
-      }
-    }*/
+    
+    let treeSpacing = 5;
+    let treeScale = 400;
     let trees = [];
     for(let x = 0; x < this._sideLen; x++) {
       for(let y = 0; y < this._sideLen; y++) {
@@ -429,21 +431,30 @@ class Scenery {
           let treeTypes = this._treeTypes.length;
           let tree = this._treeTypes[y % treeTypes].clone(
             this._treeTypes[y % treeTypes].name + "_" + x + "_" + y);
-          tree.position.x = (x - this._sideLen / 2 + Math.random()) * 200 ;
+          tree.position.x = (x - this._sideLen / 2 + Math.random()) * treeSpacing;
           tree.position.y = 0;
-          tree.position.z = (y - this._sideLen / 2 + Math.random()) * 200 ;
-          let scale = cell.value / 20;
+          tree.position.z = (y - this._sideLen / 2 + Math.random()) * treeSpacing;
+          let scale = cell.value / treeScale;
           tree.scaling = new BABYLON.Vector3(scale, scale, scale);
-          tree.getChildMeshes(false, (node) => {
-            //node.position.y /= scale;
-            return true;
-          });
           trees.push(tree);
-          this._shaddows.getShadowMap().renderList.push(tree);
+          //this._shaddows.getShadowMap().renderList.push(tree);
+        } else if(cell.value > 50) {
+          let shrubTypes = this._shrubTypes.length;
+          let shrub = this._shrubTypes[(y + x) % shrubTypes].clone(
+            this._shrubTypes[(y + x) % shrubTypes].name + "_" + x + "_" + y);
+          shrub.position.x = (x - this._sideLen / 2 + Math.random()) * treeSpacing;
+          shrub.position.y = 0;
+          shrub.position.z = (y - this._sideLen / 2 + Math.random()) * treeSpacing;
+          let scale = cell.value / treeScale;
+          //shrub.scaling = new BABYLON.Vector3(scale, scale, scale);
+          shrub.scaling.x *= scale;
+          shrub.scaling.y *= scale;
+          shrub.scaling.z *= scale;
+          trees.push(shrub);
         }
       }
     }
-    //this._trees = BABYLON.Mesh.MergeMeshes(trees);
+    //this._trees = BABYLON.Mesh.MergeMeshes(trees, true, true, null, true);
     //this._shaddows.getShadowMap().renderList.push(this._trees);
 
   }
@@ -469,6 +480,34 @@ class Scenery {
   }
 
   _createTree() : BABYLON.Mesh {
+    if(Math.random() > 0.2) {
+      return this._createTreeDeciduous();
+    }
+    return this._createTreePine();
+  }
+
+  _createTreePine() : BABYLON.Mesh {
+    let canopies = Math.round(Math.random() * 3) + 4;
+    let height = Math.round(Math.random() * 20) + 20;
+    let width = 5;
+    let trunkMaterial = new BABYLON.StandardMaterial("trunk", this._scene);
+    trunkMaterial.diffuseColor = new BABYLON.Color3(0.3 + Math.random() * 0.2,
+                                                    0.2 + Math.random() * 0.2,
+                                                    0.2 + Math.random() * 0.1);
+    trunkMaterial.specularColor = BABYLON.Color3.Black();
+    let leafMaterial = new BABYLON.StandardMaterial("leaf", this._scene);
+    leafMaterial.diffuseColor = new BABYLON.Color3(0.4 + Math.random() * 0.2,
+                                                   0.5 + Math.random() * 0.4,
+                                                   0.2 + Math.random() * 0.2);
+    leafMaterial.specularColor = BABYLON.Color3.Red();
+
+    let tree = simplePineGenerator(
+      canopies, height, width, trunkMaterial, leafMaterial, this._scene);
+    tree.setEnabled(false);
+    return tree;
+  }
+
+  _createTreeDeciduous() : BABYLON.Mesh {
     let sizeBranch = 15 + Math.random() * 5;
     let sizeTrunk = 10 + Math.random() * 5;
     let radius = 1 + Math.random() * 4;
@@ -487,6 +526,27 @@ class Scenery {
     returnVal.setEnabled(false);
     return returnVal;
   }
+
+  _createShrub() : BABYLON.Mesh {
+    if(Math.random() < 0.3) {
+      let sapling = this._createTree();
+      sapling.scaling.x *= 0.2;
+      sapling.scaling.y *= 0.2;
+      sapling.scaling.z *= 0.2;
+      return sapling;
+    }
+    let sizeBranch = 10 + Math.random() * 20;
+    let leafMaterial = new BABYLON.StandardMaterial("leaf", this._scene);
+    leafMaterial.diffuseColor = new BABYLON.Color3(0.4 + Math.random() * 0.2,
+                                                   0.5 + Math.random() * 0.4,
+                                                   0.2 + Math.random() * 0.2);
+    leafMaterial.specularColor = BABYLON.Color3.Gray();
+    let returnVal = QuickShrub( sizeBranch, leafMaterial, this._scene)
+    returnVal.setEnabled(false);
+    return returnVal;
+  }
+
+
 }
 
 class Game {
@@ -515,8 +575,8 @@ class Game {
 
     this._camera = new BABYLON.ArcRotateCamera("Camera", 0, 0, 10, new BABYLON.Vector3(0, 30, 0), this._scene);
     this._camera.setPosition(new BABYLON.Vector3(20, 70, 120));
-    this._camera.minZ = 10;
-    this._camera.maxZ = 10000;
+    this._camera.minZ = 1;
+    this._camera.maxZ = 1000;
     this._camera.attachControl(this._canvas, true);
 
     // Ground
@@ -532,10 +592,12 @@ class Game {
 
     // Meshes
     // World positions: (l/r, u/d, f/b)
-    let debugBase = BABYLON.MeshBuilder.CreateBox("debugBase", {height: 1, width: 50, depth: 100}, this._scene);
-    debugBase.receiveShadows = true;
+    // let debugBase = BABYLON.MeshBuilder.CreateBox("debugBase", {height: 0.01, width: 0.5, depth: 1}, this._scene);
+    // debugBase.receiveShadows = true;
+
     // Moving ball for the fox to watch.
-    let targetHead = BABYLON.MeshBuilder.CreateSphere("targetHead", {}, this._scene);
+    let targetHead = BABYLON.MeshBuilder.CreateSphere(
+      "targetHead", {diameterX: 0.01, diameterY: 0.01, diameterZ: 0.01}, this._scene);
     targetHead.position = this._camera.position.clone();
     shadowGenerator.getShadowMap().renderList.push(targetHead);
     // Fox
