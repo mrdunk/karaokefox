@@ -1,7 +1,6 @@
 {
   "files": [
-    "game.ts",
-    "3rdParty/babylon.d.ts"
+    "game.ts"
   ],
   "compilerOptions": {
     "target": "ES5",

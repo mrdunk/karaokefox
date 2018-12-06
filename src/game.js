@@ -1,4 +1,4 @@
-///<reference path="3rdParty/babylon.d.ts" />
+///<reference path="3rdParty/babylon.gui.module.d.ts" />
 var SCENEPATH = "scenes/";
 var FOX = "fox.babylon";
 var SCALE = 100;
@@ -251,6 +251,9 @@ var Scenery = /** @class */ (function () {
         this._treeTypes.push(this._createTree());
         this._treeTypes.push(this._createTree());
         this._shrubTypes = [];
+        this._shrubTypes.push(this._createShrub(true));
+        this._shrubTypes.push(this._createShrub());
+        this._shrubTypes.push(this._createShrub());
         this._shrubTypes.push(this._createShrub());
         this._shrubTypes.push(this._createShrub());
         this._shrubTypes.push(this._createShrub());
@@ -271,23 +274,38 @@ var Scenery = /** @class */ (function () {
             for (var x = 0; x < this._sideLen; x += segmentSize) {
                 for (var y = 0; y < this._sideLen; y += segmentSize) {
                     if (this.getCell({ x: x, y: y, recursion: recursion }) === undefined) {
-                        var pc = this.getCellParent({ x: x, y: y, recursion: recursion });
-                        if (pc === undefined) {
+                        var parentCell = this.getCellParent({ x: x, y: y, recursion: recursion });
+                        if (parentCell === undefined) {
                             this.setCell({ x: x, y: y, recursion: recursion }, 100);
                         }
-                        else if (recursion > 4 &&
+                        else if (segmentSize === 1 &&
                             x <= this._sideLen / 2 && x >= this._sideLen / 2 - segmentSize &&
                             y <= this._sideLen / 2 && y >= this._sideLen / 2 - segmentSize) {
+                            // Center of map should always be empty.
                             this.setCell({ x: x, y: y, recursion: recursion }, 0);
-                            console.log("***", recursion);
+                        }
+                        else if (segmentSize === 1 &&
+                            (x < 4 * segmentSize ||
+                                y < 4 * segmentSize ||
+                                x >= this._sideLen - 4 * segmentSize ||
+                                y >= this._sideLen - 4 * segmentSize)) {
+                            // Dense vegetation round edge.
+                            this.setCell({ x: x, y: y, recursion: recursion }, Math.random() * 200 + 50);
                         }
                         else {
-                            this.setCell({ x: x, y: y, recursion: recursion }, pc.value * (0.5 + Math.random()));
+                            this.setCell({ x: x, y: y, recursion: recursion }, parentCell.value * (0.5 + Math.random()));
                         }
                     }
                 }
             }
         }
+        /*for(let x = 0; x < this._sideLen; x++) {
+          let line = "";
+          for(let y = 0; y < this._sideLen; y++) {
+            line += " " + Math.round(this.getCell({x, y, recursion: 5}).value);
+          }
+          console.log(line);
+        }*/
         var treeSpacing = 5;
         var treeScale = 400;
         var trees = [];
@@ -295,9 +313,10 @@ var Scenery = /** @class */ (function () {
             for (var y = 0; y < this._sideLen; y++) {
                 var cell = this.getCell({ x: x, y: y, recursion: this._sideMagnitude });
                 if (cell.value > 100) {
-                    //let tree = this._treeTypes[0].createInstance(this._treeTypes[0].name + "_" + x + "_" + y);
                     var treeTypes = this._treeTypes.length;
-                    var tree = this._treeTypes[y % treeTypes].clone(this._treeTypes[y % treeTypes].name + "_" + x + "_" + y);
+                    var tree = this._treeTypes[(x + y) % treeTypes].clone(this._treeTypes[(x + y) % treeTypes].name + "_" + x + "_" + y);
+                    //let tree = this._treeTypes[y % treeTypes].createInstance(
+                    //  this._treeTypes[y % treeTypes].name + "_" + x + "_" + y);
                     tree.position.x = (x - this._sideLen / 2 + Math.random()) * treeSpacing;
                     tree.position.y = 0;
                     tree.position.z = (y - this._sideLen / 2 + Math.random()) * treeSpacing;
@@ -375,8 +394,8 @@ var Scenery = /** @class */ (function () {
         returnVal.setEnabled(false);
         return returnVal;
     };
-    Scenery.prototype._createShrub = function () {
-        if (Math.random() < 0.3) {
+    Scenery.prototype._createShrub = function (forceSapling) {
+        if (Math.random() < 0.1 || forceSapling) {
             var sapling = this._createTree();
             sapling.scaling.x *= 0.2;
             sapling.scaling.y *= 0.2;
@@ -404,24 +423,46 @@ var Game = /** @class */ (function () {
         BABYLON.SceneLoader.CleanBoneMatrixWeights = true;
         this._scene = new BABYLON.Scene(this._engine);
         this._scene.ambientColor = new BABYLON.Color3(0.3, 0.3, 0.3);
+        // Fog
+        this._scene.fogMode = BABYLON.Scene.FOGMODE_EXP2;
+        this._scene.fogColor = new BABYLON.Color3(0.2, 0.2, 0.2);
+        this._scene.fogDensity = 0.003;
+        // Skybox
+        this._skybox = BABYLON.Mesh.CreateBox("skyBox", 1000.0, this._scene);
+        this._skybox.scaling.y = 0.125;
+        var skyboxMaterial = new BABYLON.StandardMaterial("skyBox", this._scene);
+        skyboxMaterial.reflectionTexture = new BABYLON.CubeTexture("textures/skybox", this._scene);
+        skyboxMaterial.reflectionTexture.coordinatesMode = BABYLON.Texture.SKYBOX_MODE;
+        skyboxMaterial.diffuseColor = new BABYLON.Color3(0, 0, 0);
+        skyboxMaterial.specularColor = new BABYLON.Color3(0, 0, 0);
+        skyboxMaterial.disableLighting = true;
+        skyboxMaterial.backFaceCulling = false;
+        this._skybox.material = skyboxMaterial;
+        // Lighting
         this._light = new BABYLON.DirectionalLight("dir01", new BABYLON.Vector3(0, -0.5, -1.0), this._scene);
         this._light.position = new BABYLON.Vector3(20, 150, 70);
         var sun = BABYLON.MeshBuilder.CreateSphere("sun", {}, this._scene);
         sun.position = this._light.position;
-        this._camera = new BABYLON.ArcRotateCamera("Camera", 0, 0, 10, new BABYLON.Vector3(0, 30, 0), this._scene);
-        this._camera.setPosition(new BABYLON.Vector3(20, 70, 120));
-        this._camera.minZ = 1;
+        // Camera
+        this._camera = new BABYLON.ArcRotateCamera("Camera", 0, 0, 2, new BABYLON.Vector3(0, 30, 0), this._scene);
+        this._camera.setPosition(new BABYLON.Vector3(5, 17, 30));
+        this._camera.minZ = 0.1;
         this._camera.maxZ = 1000;
+        this._camera.upperBetaLimit = (Math.PI / 2) - 0.1;
+        this._camera.lowerRadiusLimit = 2;
         this._camera.attachControl(this._canvas, true);
         // Ground
-        var ground = BABYLON.Mesh.CreateGround("ground", 10000, 10000, 1, this._scene, false);
+        var ground = BABYLON.Mesh.CreateGround("ground", 1000, 1000, 1, this._scene, false);
         var groundMaterial = new BABYLON.StandardMaterial("ground", this._scene);
-        groundMaterial.diffuseColor = new BABYLON.Color3(0.2, 0.2, 0.2);
+        groundMaterial.diffuseTexture = new BABYLON.Texture("textures/grass.png", this._scene);
+        groundMaterial.diffuseTexture.uScale = 64;
+        groundMaterial.diffuseTexture.vScale = 64;
+        groundMaterial.diffuseColor = new BABYLON.Color3(0.4, 0.4, 0.4);
         groundMaterial.specularColor = new BABYLON.Color3(0, 0, 0);
         ground.material = groundMaterial;
         ground.receiveShadows = true;
         // Shadows
-        var shadowGenerator = new BABYLON.ShadowGenerator(2048, this._light);
+        var shadowGenerator = new BABYLON.ShadowGenerator(1024, this._light);
         // Meshes
         // World positions: (l/r, u/d, f/b)
         // let debugBase = BABYLON.MeshBuilder.CreateBox("debugBase", {height: 0.01, width: 0.5, depth: 1}, this._scene);
@@ -462,6 +503,7 @@ var Game = /** @class */ (function () {
             console.log("Add walk animation.");
             fox.queueAnimation({ name: "walk", loop: true, reversed: false });
         }.bind(this), 30000);
+        this.controlPannel();
     };
     Game.prototype.doRender = function () {
         var _this = this;
@@ -475,6 +517,59 @@ var Game = /** @class */ (function () {
         window.addEventListener('resize', function () {
             _this._engine.resize();
         });
+    };
+    Game.prototype.controlPannel = function () {
+        var _this = this;
+        var advancedTexture = BABYLON.GUI.AdvancedDynamicTexture.CreateFullscreenUI("UI");
+        var grid = new BABYLON.GUI.Grid();
+        grid.addColumnDefinition(10, true);
+        grid.addColumnDefinition(100, true);
+        grid.addRowDefinition(20, true);
+        grid.addRowDefinition(20, true);
+        advancedTexture.addControl(grid);
+        var panel = new BABYLON.GUI.StackPanel();
+        panel.width = "220px";
+        panel.fontSize = "14px";
+        panel.horizontalAlignment = BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_RIGHT;
+        panel.verticalAlignment = BABYLON.GUI.Control.VERTICAL_ALIGNMENT_CENTER;
+        var checkbox = new BABYLON.GUI.Checkbox();
+        checkbox.width = "20px";
+        checkbox.height = "20px";
+        checkbox.isChecked = true;
+        checkbox.color = "green";
+        checkbox.onIsCheckedChangedObservable.add(function (value) {
+            console.log("%c SkyBox:", "background: blue; color: white", value);
+            _this._skybox.setEnabled(value);
+        });
+        grid.addControl(checkbox, 0, 0);
+        var header = BABYLON.GUI.Control.AddHeader(checkbox, "SkyBox", "180px", { isHorizontal: true, controlFirst: true });
+        header.color = "white";
+        header.height = "20px";
+        header.horizontalAlignment = BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
+        grid.addControl(header, 0, 1);
+        var checkbox2 = new BABYLON.GUI.Checkbox();
+        checkbox2.width = "20px";
+        checkbox2.height = "20px";
+        checkbox2.isChecked = true;
+        checkbox2.color = "green";
+        checkbox2.onIsCheckedChangedObservable.add(function (value) {
+            console.log("%c Fog:", "background: blue; color: white", value);
+            if (value) {
+                _this._scene.fogMode = BABYLON.Scene.FOGMODE_EXP2;
+            }
+            else {
+                //this._scene.fogMode = BABYLON.Scene.FOGMODE_LINEAR;
+                //this._scene.fogStart = 100.0;
+                //this._scene.fogEnd = 200.0;
+                _this._scene.fogMode = BABYLON.Scene.FOGMODE_NONE;
+            }
+        });
+        grid.addControl(checkbox2, 1, 0);
+        var header2 = BABYLON.GUI.Control.AddHeader(checkbox2, "Fog", "180px", { isHorizontal: true, controlFirst: true });
+        header2.color = "white";
+        header2.height = "20px";
+        header2.horizontalAlignment = BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
+        grid.addControl(header2, 1, 1);
     };
     return Game;
 }());
