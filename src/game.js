@@ -38,7 +38,7 @@ var Character = /** @class */ (function () {
             // Parse all bones and store any we need later for future access.
             for (var index = 0; index < this._skeleton.bones.length; index++) {
                 var bone = skeletons[0].bones[index];
-                console.log(bone.uniqueId, bone.id);
+                // console.log(bone.uniqueId, bone.id);
                 switch (bone.id) {
                     case "spine.head":
                         this._bones.head = bone;
@@ -57,7 +57,7 @@ var Character = /** @class */ (function () {
             // Animations
             for (var a = 0; a < this._skeleton.getAnimationRanges().length; a++) {
                 var animation = this._skeleton.getAnimationRanges()[a];
-                console.log(a, animation.name);
+                //console.log(a, animation.name);
                 this._animations[animation.name] = this._skeleton.getAnimationRanges()[a];
             }
             this._animationQueue.push({ name: "walk", loop: true, reversed: false });
@@ -233,9 +233,12 @@ var SceneryCell = /** @class */ (function () {
 }());
 var Scenery = /** @class */ (function () {
     function Scenery(scene, shaddows, size) {
+        console.log("Mesh count before creating scenery: %c" +
+            scene.meshes.length.toString(), "background: orange; color: white");
         this._scene = scene;
         this._shaddows = shaddows;
         this._treeTypes = [];
+        this._treeSpecies = 0;
         // Ensure there are always /some/ of each type of tree.
         this._treeTypes.push(this._createTreePine());
         this._treeTypes.push(this._createTreeDeciduous());
@@ -263,14 +266,13 @@ var Scenery = /** @class */ (function () {
         this._shrubTypes.push(this._createShrub());
         this._sideLen = size;
         this._sideMagnitude = Math.floor(Math.log(size) / Math.log(2));
-        console.log(this._sideMagnitude);
         console.assert(Math.pow(2, this._sideMagnitude) === this._sideLen &&
             Boolean("size not a power of 2."));
         this._cells = {};
         for (var p = this._sideMagnitude; p >= 0; p--) {
             var segmentSize = Math.pow(2, p);
             var recursion = this._sideMagnitude - p;
-            console.log(p, segmentSize, recursion);
+            // console.log(p, segmentSize, recursion);
             for (var x = 0; x < this._sideLen; x += segmentSize) {
                 for (var y = 0; y < this._sideLen; y += segmentSize) {
                     if (this.getCell({ x: x, y: y, recursion: recursion }) === undefined) {
@@ -340,11 +342,16 @@ var Scenery = /** @class */ (function () {
                 }
             }
         }
+        // Don't need the prototypes any more so delete them.
+        this._treeTypes.forEach(function (node) { node.dispose(); });
+        this._shrubTypes.forEach(function (node) { node.dispose(); });
+        this._consolidateTrees(trees);
         //this._trees = BABYLON.Mesh.MergeMeshes(trees, true, true, null, true);
         //this._shaddows.getShadowMap().renderList.push(this._trees);
     }
     Scenery.prototype.setCell = function (coord, value) {
-        this._cells["" + coord.x + "," + coord.y + "|" + coord.recursion] = new SceneryCell(coord, value);
+        this._cells["" + coord.x + "," + coord.y + "|" + coord.recursion] =
+            new SceneryCell(coord, value);
     };
     Scenery.prototype.getCell = function (coord) {
         //console.log("getCell", coord);
@@ -359,6 +366,68 @@ var Scenery = /** @class */ (function () {
             return this.getCell(new SceneryCell(coord, -1).parentCoordinates(this._sideMagnitude));
         }
         return this.getCell(cell.parentCoordinates(this._sideMagnitude));
+    };
+    Scenery.prototype._consolidateTrees = function (trees) {
+        console.log("Mesh count before _consolidateTrees: %c" +
+            this._scene.meshes.length.toString(), "background: orange; color: white");
+        var countStart = 0;
+        var countFinal = 0;
+        var treeFoliageBucket = new Array(this._treeSpecies).fill(undefined);
+        var treeTrunkBucket = new Array(this._treeSpecies).fill(undefined);
+        trees.forEach(function (tree) {
+            // Collect the different tree species together in 2 collections:
+            // trunks and leaves.
+            var treeIndex = parseInt(tree.name.split("_")[1], 10);
+            if (treeFoliageBucket[treeIndex] === undefined || treeTrunkBucket == undefined) {
+                treeFoliageBucket[treeIndex] = [];
+                treeTrunkBucket[treeIndex] = [];
+            }
+            tree.getChildMeshes(true).forEach(function (node) {
+                var nodeName = node.name.split(".")[1];
+                if (nodeName === "leaves") {
+                    var pos = node.getAbsolutePosition();
+                    node.setParent(null);
+                    node.setAbsolutePosition(pos);
+                    treeFoliageBucket[treeIndex].push(node);
+                }
+                else if (nodeName === "trunk") {
+                    var pos = node.getAbsolutePosition();
+                    node.setParent(null);
+                    node.setAbsolutePosition(pos);
+                    treeTrunkBucket[treeIndex].push(node);
+                }
+                else {
+                    console.log(nodeName);
+                    console.assert(false && "Unknown tree component");
+                }
+            });
+            // We have the component parts so don't need the original tree anymore.
+            tree.dispose();
+        });
+        // Combine all trunks of the same species together.
+        treeTrunkBucket.forEach(function (bucket) {
+            if (bucket.length) {
+                countStart += bucket.length;
+                countFinal++;
+                var t = BABYLON.Mesh.MergeMeshes(bucket, true, true, null, true);
+                // this._shaddows.getShadowMap().renderList.push(t);
+            }
+        }, this);
+        // Combine all leaves of the same species together.
+        treeFoliageBucket.forEach(function (bucket) {
+            if (bucket.length) {
+                countStart += bucket.length;
+                countFinal++;
+                var t = BABYLON.Mesh.MergeMeshes(bucket, true, true, null, true);
+                // this._shaddows.getShadowMap().renderList.push(t);
+            }
+        }, this);
+        console.log("Tree component count before _consolidateTrees: %c" +
+            countStart.toString(), "background: orange; color: white");
+        console.log("Mesh count after _consolidateTrees: %c" +
+            this._scene.meshes.length.toString(), "background: orange; color: white");
+        console.log("Tree component count after _consolidateTrees: %c" +
+            countFinal.toString(), "background: orange; color: white");
     };
     Scenery.prototype._createTree = function () {
         if (Math.random() > 0.2) {
@@ -378,6 +447,8 @@ var Scenery = /** @class */ (function () {
         leafMaterial.specularColor = BABYLON.Color3.Red();
         var tree = simplePineGenerator(canopies, height, width, trunkMaterial, leafMaterial, this._scene);
         tree.setEnabled(false);
+        tree.name += "_" + this._treeSpecies;
+        this._treeSpecies++;
         return tree;
     };
     Scenery.prototype._createTreeDeciduous = function () {
@@ -390,9 +461,11 @@ var Scenery = /** @class */ (function () {
         var leafMaterial = new BABYLON.StandardMaterial("leaf", this._scene);
         leafMaterial.diffuseColor = new BABYLON.Color3(0.4 + Math.random() * 0.2, 0.5 + Math.random() * 0.4, 0.2 + Math.random() * 0.2);
         leafMaterial.specularColor = BABYLON.Color3.Red();
-        var returnVal = QuickTreeGenerator(sizeBranch, sizeTrunk, radius, trunkMaterial, leafMaterial, this._scene);
-        returnVal.setEnabled(false);
-        return returnVal;
+        var tree = QuickTreeGenerator(sizeBranch, sizeTrunk, radius, trunkMaterial, leafMaterial, this._scene);
+        tree.setEnabled(false);
+        tree.name += "_" + this._treeSpecies;
+        this._treeSpecies++;
+        return tree;
     };
     Scenery.prototype._createShrub = function (forceSapling) {
         if (Math.random() < 0.1 || forceSapling) {
@@ -406,9 +479,11 @@ var Scenery = /** @class */ (function () {
         var leafMaterial = new BABYLON.StandardMaterial("leaf", this._scene);
         leafMaterial.diffuseColor = new BABYLON.Color3(0.4 + Math.random() * 0.2, 0.5 + Math.random() * 0.4, 0.2 + Math.random() * 0.2);
         leafMaterial.specularColor = BABYLON.Color3.Gray();
-        var returnVal = QuickShrub(sizeBranch, leafMaterial, this._scene);
-        returnVal.setEnabled(false);
-        return returnVal;
+        var tree = QuickShrub(sizeBranch, leafMaterial, this._scene);
+        tree.setEnabled(false);
+        tree.name += "_" + this._treeSpecies;
+        this._treeSpecies++;
+        return tree;
     };
     return Scenery;
 }());
@@ -504,6 +579,7 @@ var Game = /** @class */ (function () {
             fox.queueAnimation({ name: "walk", loop: true, reversed: false });
         }.bind(this), 30000);
         this.controlPannel();
+        console.log(this._scene.meshes.length);
     };
     Game.prototype.doRender = function () {
         var _this = this;

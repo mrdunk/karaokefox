@@ -23,7 +23,7 @@ var simplePineGenerator = function(canopies, height, width, trunkMaterial, leafM
 		return radius;
 	};  
 
-	var leaves = BABYLON.Mesh.CreateTube("tube", curve, 0, 10, radiusFunction, BABYLON.Mesh.CAP_ALL, scene);
+	var leaves = BABYLON.Mesh.CreateTube("leaves", curve, 0, 10, radiusFunction, BABYLON.Mesh.CAP_ALL, scene);
   leaves.scaling.x = width / 10;
   leaves.scaling.z = width / 10;
 

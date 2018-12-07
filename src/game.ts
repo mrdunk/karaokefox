@@ -85,7 +85,7 @@ class Character {
       // Parse all bones and store any we need later for future access.
       for(let index = 0; index < this._skeleton.bones.length; index++) {
         let bone = skeletons[0].bones[index];
-        console.log(bone.uniqueId, bone.id);
+        // console.log(bone.uniqueId, bone.id);
         switch(bone.id) {
           case "spine.head":
             this._bones.head = bone;
@@ -105,7 +105,7 @@ class Character {
       // Animations
       for(let a = 0; a < this._skeleton.getAnimationRanges().length; a++) {
         let animation = this._skeleton.getAnimationRanges()[a];
-        console.log(a, animation.name);
+        //console.log(a, animation.name);
         this._animations[animation.name] = this._skeleton.getAnimationRanges()[a];
       }
       this._animationQueue.push({name: "walk", loop: true, reversed: false});
@@ -356,15 +356,19 @@ class Scenery {
   private _cells: {[id: string] : SceneryCell};
   private _treeTypes: BABYLON.Mesh[];
   private _shrubTypes: BABYLON.Mesh[];
-  private _trees: BABYLON.Mesh;
+  private _treeSpecies: number;
 
   constructor(scene: BABYLON.Scene,
               shaddows: BABYLON.ShadowGenerator,
               size: number) {
+    console.log("Mesh count before creating scenery: %c" +
+                scene.meshes.length.toString(),
+                "background: orange; color: white");
     this._scene = scene;
     this._shaddows = shaddows;
 
     this._treeTypes = [];
+    this._treeSpecies = 0;
     // Ensure there are always /some/ of each type of tree.
     this._treeTypes.push(this._createTreePine());
     this._treeTypes.push(this._createTreeDeciduous());
@@ -394,7 +398,6 @@ class Scenery {
 
     this._sideLen = size;
     this._sideMagnitude = Math.floor(Math.log(size) / Math.log(2));
-    console.log(this._sideMagnitude);
     console.assert(Math.pow(2, this._sideMagnitude) === this._sideLen &&
                    Boolean("size not a power of 2."));
 
@@ -403,7 +406,7 @@ class Scenery {
     for(let p = this._sideMagnitude; p >= 0; p--) {
       let segmentSize = Math.pow(2, p);
       let recursion = this._sideMagnitude - p;
-      console.log(p, segmentSize, recursion);
+      // console.log(p, segmentSize, recursion);
       for(let x = 0; x < this._sideLen; x += segmentSize) {
         for(let y = 0; y < this._sideLen; y += segmentSize) {
           if(this.getCell({x, y, recursion}) === undefined) {
@@ -474,13 +477,19 @@ class Scenery {
         }
       }
     }
+    // Don't need the prototypes any more so delete them.
+    this._treeTypes.forEach((node) => { node.dispose(); });
+    this._shrubTypes.forEach((node) => { node.dispose(); });
+
+    this._consolidateTrees(trees);
+
     //this._trees = BABYLON.Mesh.MergeMeshes(trees, true, true, null, true);
     //this._shaddows.getShadowMap().renderList.push(this._trees);
-
   }
 
   setCell(coord: Coord, value: number) : void {
-    this._cells["" + coord.x + "," + coord.y + "|" + coord.recursion] = new SceneryCell(coord, value);
+    this._cells["" + coord.x + "," + coord.y + "|" + coord.recursion] =
+      new SceneryCell(coord, value);
   }
 
   getCell(coord: Coord) : SceneryCell {
@@ -497,6 +506,76 @@ class Scenery {
       return this.getCell(new SceneryCell(coord, -1).parentCoordinates(this._sideMagnitude));
     }
     return this.getCell(cell.parentCoordinates(this._sideMagnitude));
+  }
+
+  _consolidateTrees(trees: BABYLON.Mesh[]) : void {
+    console.log("Mesh count before _consolidateTrees: %c" +
+                this._scene.meshes.length.toString(),
+                "background: orange; color: white");
+
+    let countStart = 0;
+    let countFinal = 0;
+
+    let treeFoliageBucket = new Array(this._treeSpecies).fill(undefined);
+    let treeTrunkBucket = new Array(this._treeSpecies).fill(undefined);
+    trees.forEach((tree) => {
+      // Collect the different tree species together in 2 collections:
+      // trunks and leaves.
+      let treeIndex = parseInt(tree.name.split("_")[1], 10);
+      if(treeFoliageBucket[treeIndex] === undefined || treeTrunkBucket == undefined) {
+        treeFoliageBucket[treeIndex] = [];
+        treeTrunkBucket[treeIndex] = [];
+      }
+      tree.getChildMeshes(true).forEach((node) => {
+        let nodeName = node.name.split(".")[1];
+        if(nodeName === "leaves") {
+          let pos = node.getAbsolutePosition();
+          node.setParent(null);
+          node.setAbsolutePosition(pos);
+          treeFoliageBucket[treeIndex].push(node);
+        } else if(nodeName === "trunk") {
+          let pos = node.getAbsolutePosition();
+          node.setParent(null);
+          node.setAbsolutePosition(pos);
+          treeTrunkBucket[treeIndex].push(node);
+        } else {
+          console.log(nodeName);
+          console.assert(false && "Unknown tree component");
+        }
+      });
+      // We have the component parts so don't need the original tree anymore.
+      tree.dispose();
+    });
+
+    // Combine all trunks of the same species together.
+    treeTrunkBucket.forEach((bucket) => {
+      if(bucket.length) {
+        countStart += bucket.length;
+        countFinal++;
+        let t = BABYLON.Mesh.MergeMeshes(bucket, true, true, null, true);
+        // this._shaddows.getShadowMap().renderList.push(t);
+      }
+    }, this);
+    // Combine all leaves of the same species together.
+    treeFoliageBucket.forEach((bucket) => {
+      if(bucket.length) {
+        countStart += bucket.length;
+        countFinal++;
+        let t = BABYLON.Mesh.MergeMeshes(bucket, true, true, null, true);
+        // this._shaddows.getShadowMap().renderList.push(t);
+      }
+    }, this);
+
+
+    console.log("Tree component count before _consolidateTrees: %c" +
+                countStart.toString(),
+                "background: orange; color: white");
+    console.log("Mesh count after _consolidateTrees: %c" +
+                this._scene.meshes.length.toString(),
+                "background: orange; color: white");
+    console.log("Tree component count after _consolidateTrees: %c" +
+                countFinal.toString(),
+                "background: orange; color: white");
   }
 
   _createTree() : BABYLON.Mesh {
@@ -524,6 +603,8 @@ class Scenery {
     let tree = simplePineGenerator(
       canopies, height, width, trunkMaterial, leafMaterial, this._scene);
     tree.setEnabled(false);
+    tree.name += "_" + this._treeSpecies;
+    this._treeSpecies++;
     return tree;
   }
 
@@ -541,10 +622,12 @@ class Scenery {
                                                    0.5 + Math.random() * 0.4,
                                                    0.2 + Math.random() * 0.2);
     leafMaterial.specularColor = BABYLON.Color3.Red();
-    let returnVal = QuickTreeGenerator(
+    let tree = QuickTreeGenerator(
       sizeBranch, sizeTrunk, radius, trunkMaterial, leafMaterial, this._scene)
-    returnVal.setEnabled(false);
-    return returnVal;
+    tree.setEnabled(false);
+    tree.name += "_" + this._treeSpecies;
+    this._treeSpecies++;
+    return tree;
   }
 
   _createShrub(forceSapling?: boolean) : BABYLON.Mesh {
@@ -561,9 +644,11 @@ class Scenery {
                                                    0.5 + Math.random() * 0.4,
                                                    0.2 + Math.random() * 0.2);
     leafMaterial.specularColor = BABYLON.Color3.Gray();
-    let returnVal = QuickShrub( sizeBranch, leafMaterial, this._scene)
-    returnVal.setEnabled(false);
-    return returnVal;
+    let tree = QuickShrub( sizeBranch, leafMaterial, this._scene)
+    tree.setEnabled(false);
+    tree.name += "_" + this._treeSpecies;
+    this._treeSpecies++;
+    return tree;
   }
 
 
@@ -684,8 +769,9 @@ class Game {
       console.log("Add walk animation.");
       fox.queueAnimation({name: "walk", loop: true, reversed: false});
     }.bind(this), 30000);
-
+    
     this.controlPannel();
+    console.log(this._scene.meshes.length);
   }
 
   doRender() : void {
@@ -764,12 +850,12 @@ class Game {
 }
 
 window.addEventListener('DOMContentLoaded', () => {
-    // Create the game using the 'renderCanvas'.
-    let game = new Game('renderCanvas');
+	// Create the game using the 'renderCanvas'.
+	let game = new Game('renderCanvas');
 
-    // Create the scene.
-    game.createScene();
+	// Create the scene.
+	game.createScene();
 
-    // Start render loop.
-    game.doRender();
+	// Start render loop.
+	game.doRender();
 });
