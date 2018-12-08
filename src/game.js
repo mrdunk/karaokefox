@@ -4,6 +4,38 @@ var FOX = "fox.babylon";
 var SCALE = 100;
 var ANIM_MERGE_RATE = 0.05;
 var SCENERY_RECURSION = 8;
+var Star = /** @class */ (function () {
+    function Star(scene) {
+        this._scene = scene;
+        var gl = new BABYLON.GlowLayer("glow", this._scene);
+        var starMaterialW = new BABYLON.StandardMaterial("starMaterialW", this._scene);
+        starMaterialW.emissiveColor = new BABYLON.Color3(1, 1, 1);
+        var starMaterialR = new BABYLON.StandardMaterial("starMaterialR", this._scene);
+        starMaterialR.emissiveColor = new BABYLON.Color3(1, 0.7, 0.7);
+        var starMaterialG = new BABYLON.StandardMaterial("starMaterialG", this._scene);
+        starMaterialG.emissiveColor = new BABYLON.Color3(0.7, 1, 0.7);
+        var starMaterialB = new BABYLON.StandardMaterial("starMaterialB", this._scene);
+        starMaterialB.emissiveColor = new BABYLON.Color3(0.7, 0.7, 1);
+        var boxA = BABYLON.MeshBuilder.CreateBox("boxA", {}, this._scene);
+        var boxB = BABYLON.MeshBuilder.CreateBox("boxB", {}, this._scene);
+        var boxC = BABYLON.MeshBuilder.CreateBox("boxC", {}, this._scene);
+        var boxD = BABYLON.MeshBuilder.CreateBox("boxD", {}, this._scene);
+        boxB.rotate(BABYLON.Axis.X, Math.PI / 4);
+        boxC.rotate(BABYLON.Axis.Y, Math.PI / 4);
+        boxD.rotate(BABYLON.Axis.Z, Math.PI / 4);
+        boxA.material = starMaterialW;
+        boxB.material = starMaterialR;
+        boxC.material = starMaterialG;
+        boxD.material = starMaterialB;
+        this.mesh = BABYLON.Mesh.CreateBox("star", 1, this._scene);
+        this.mesh.isVisible = false;
+        boxA.parent = this.mesh;
+        boxB.parent = this.mesh;
+        boxC.parent = this.mesh;
+        boxD.parent = this.mesh;
+    }
+    return Star;
+}());
 var Character = /** @class */ (function () {
     function Character(scene, shaddows, filename, onLoaded) {
         console.log("Creating Character from " + filename);
@@ -101,14 +133,17 @@ var Character = /** @class */ (function () {
             var lookAtNeckLocal = new BABYLON.Vector3(Math.sin(angleXY / 2) * targetLocalXY.length(), (Math.cos(angleXY / 2) * targetLocalXY.length() +
                 Math.cos(angleYZ / 2) * targetLocalYZ.length()) / 2, Math.sin(angleYZ / 2) * targetLocalYZ.length());
             spineUpper.getAbsolutePositionFromLocalToRef(lookAtNeckLocal, this._mesh, this._lookAtNeck);
-            if (angleXY > -Math.PI / 2 && angleXY < Math.PI / 2 && angleYZ > -Math.PI / 2 && angleYZ < Math.PI / 2) {
+            if (angleXY > -Math.PI / 2 && angleXY < Math.PI / 2 &&
+                angleYZ > -Math.PI / 2 && angleYZ < Math.PI / 2) {
                 // Only look at thing if it's not behind us.
                 //this._lookCtrlNeck.update();
                 //this._lookCtrlHead.update();
                 this._bones.neck.rotate(BABYLON.Axis.Z, -angleXY / 2, BABYLON.Space.LOCAL);
                 this._bones.neck.rotate(BABYLON.Axis.X, angleYZ / 2, BABYLON.Space.LOCAL);
+                this._bones.neck.rotate(BABYLON.Axis.Y, -angleYZ * angleXY / (2 * Math.PI), BABYLON.Space.LOCAL);
                 this._bones.head.rotate(BABYLON.Axis.Z, -angleXY / 2, BABYLON.Space.LOCAL);
                 this._bones.head.rotate(BABYLON.Axis.X, angleYZ / 2, BABYLON.Space.LOCAL);
+                this._bones.head.rotate(BABYLON.Axis.Y, -angleYZ * angleXY / (2 * Math.PI), BABYLON.Space.LOCAL);
             }
         }.bind(this));
     };
@@ -487,11 +522,75 @@ var Scenery = /** @class */ (function () {
     };
     return Scenery;
 }());
+var Camera = /** @class */ (function () {
+    function Camera(canvas, scene, actors) {
+        var _this = this;
+        this._canvas = canvas;
+        this._scene = scene;
+        this.cameras = [];
+        this._target = BABYLON.MeshBuilder.CreateSphere("targetCamera", { diameterX: 0.1, diameterY: 0.1, diameterZ: 0.1 }, this._scene);
+        this._target.position = new BABYLON.Vector3(100, 40, 100);
+        this._cameraArc = new BABYLON.ArcRotateCamera("Camera", 0, 0, 2, new BABYLON.Vector3(0, 30, 0), this._scene);
+        this._cameraArc.setPosition(new BABYLON.Vector3(5, 17, 30));
+        this._cameraArc.minZ = 0.1;
+        this._cameraArc.maxZ = 1000;
+        this._cameraArc.upperBetaLimit = (Math.PI / 2) - 0.1;
+        this._cameraArc.lowerRadiusLimit = 2;
+        this._cameraArc.attachControl(this._canvas, true, false);
+        this._cameraArc.setTarget(this._target.position);
+        this._scene.activeCamera = this._cameraArc;
+        this.cameras.push({ "name": "ArcRotate", "camera": this._cameraArc });
+        this._cameraUniversal = new BABYLON.UniversalCamera("UniversalCamera", new BABYLON.Vector3(0, 0, -10), this._scene);
+        this._cameraUniversal.setTarget(this._target.position);
+        this.cameras.push({ "name": "Univarsal", "camera": this._cameraUniversal });
+        this._scene.onBeforeRenderObservable.add(function () {
+            if (_this._cameraArc.getTarget() != _this._target.position) {
+                _this._cameraArc.setTarget(_this._target.position);
+            }
+            //this._cameraArc.rebuildAnglesAndRadius();
+        });
+    }
+    Camera.prototype.setTarget = function (targetPosition) {
+        //this._cameraArc.setTarget(targetPosition);
+        //this._cameraUniversal.setTarget(targetPosition);
+        console.log(targetPosition, this._target.position);
+        var animation = new BABYLON.Animation("cameraTargetEase", "position", 30, BABYLON.Animation.ANIMATIONTYPE_VECTOR3, BABYLON.Animation.ANIMATIONLOOPMODE_CYCLE);
+        // Animation keys
+        var keys = [];
+        keys.push({ frame: 0, value: this._target.position });
+        keys.push({ frame: 120, value: targetPosition });
+        animation.setKeys(keys);
+        var easingFunction = new BABYLON.CircleEase();
+        easingFunction.setEasingMode(BABYLON.EasingFunction.EASINGMODE_EASEINOUT);
+        animation.setEasingFunction(easingFunction);
+        this._target.animations.push(animation);
+        this._scene.beginAnimation(this._target, 0, 120, false);
+    };
+    Camera.prototype.setEnabled = function (camera) {
+        console.log(camera);
+        if (camera.name === "ArcRotate") {
+            this._cameraArc.setPosition(this._cameraUniversal.position);
+            this._cameraArc.rebuildAnglesAndRadius();
+            this._cameraUniversal.detachControl(this._canvas);
+            this._cameraArc.attachControl(this._canvas, true, false);
+            this._scene.activeCamera = this._cameraArc;
+        }
+        else {
+            this._cameraArc.detachControl(this._canvas);
+            this._cameraUniversal.attachControl(this._canvas, true);
+            this._cameraUniversal.position = this._cameraArc.position;
+            this._cameraUniversal.setTarget(this._cameraArc.getTarget());
+            this._scene.activeCamera = this._cameraUniversal;
+        }
+    };
+    return Camera;
+}());
 var Game = /** @class */ (function () {
     function Game(canvasElement) {
         // Create canvas and engine.
         this._canvas = document.getElementById(canvasElement);
         this._engine = new BABYLON.Engine(this._canvas, true);
+        this._actors = [];
     }
     Game.prototype.createScene = function () {
         var _this = this;
@@ -519,15 +618,7 @@ var Game = /** @class */ (function () {
         var sun = BABYLON.MeshBuilder.CreateSphere("sun", {}, this._scene);
         sun.position = this._light.position;
         // Camera
-        this._camera = new BABYLON.ArcRotateCamera("Camera", 0, 0, 2, new BABYLON.Vector3(0, 30, 0), this._scene);
-        this._camera.setPosition(new BABYLON.Vector3(5, 17, 30));
-        this._camera.minZ = 0.1;
-        this._camera.maxZ = 1000;
-        this._camera.upperBetaLimit = (Math.PI / 2) - 0.1;
-        this._camera.lowerRadiusLimit = 2;
-        this._camera.attachControl(this._canvas, true, false);
-        this._scene.activeCamera = this._camera;
-        this._camera2 = new BABYLON.UniversalCamera("UniversalCamera", new BABYLON.Vector3(0, 0, -10), this._scene);
+        this._camera = new Camera(this._canvas, this._scene, this._actors);
         // Ground
         var ground = BABYLON.Mesh.CreateGround("ground", 1000, 1000, 1, this._scene, false);
         var groundMaterial = new BABYLON.StandardMaterial("ground", this._scene);
@@ -552,10 +643,13 @@ var Game = /** @class */ (function () {
         var fox = new Character(this._scene, shadowGenerator, FOX, function () {
             console.log("fox loaded");
             _this._camera.setTarget(fox.position);
-            _this._camera2.setTarget(fox.position);
             fox.lookAt(targetHead.position);
             fox.rotation.y = Math.PI;
         });
+        this._actors.push(fox);
+        // Star
+        var star = new Star(this._scene);
+        star.mesh.position = new BABYLON.Vector3(0, 2, 0);
         var scenery = new Scenery(this._scene, shadowGenerator, 32);
         this._scene.onPointerDown = function (evt, pickResult) {
             // if the click hits the ground object, we change the impact position
@@ -602,11 +696,14 @@ var Game = /** @class */ (function () {
         var advancedTexture = BABYLON.GUI.AdvancedDynamicTexture.CreateFullscreenUI("UI");
         var grid = new BABYLON.GUI.Grid();
         grid.addColumnDefinition(10, true);
-        grid.addColumnDefinition(100, true);
+        grid.addColumnDefinition(200, true);
         grid.addRowDefinition(20, true);
         grid.addRowDefinition(20, true);
-        grid.addRowDefinition(20, true);
+        this._camera.cameras.forEach(function (camera) {
+            grid.addRowDefinition(20, true);
+        });
         advancedTexture.addControl(grid);
+        var gridcount = 0;
         var panel = new BABYLON.GUI.StackPanel();
         panel.width = "220px";
         panel.fontSize = "14px";
@@ -621,12 +718,12 @@ var Game = /** @class */ (function () {
             console.log("%c SkyBox:", "background: blue; color: white", value);
             _this._skybox.setEnabled(value);
         });
-        grid.addControl(checkbox, 0, 0);
+        grid.addControl(checkbox, gridcount, 0);
         var header = BABYLON.GUI.Control.AddHeader(checkbox, "SkyBox", "180px", { isHorizontal: true, controlFirst: true });
         header.color = "white";
         header.height = "20px";
         header.horizontalAlignment = BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
-        grid.addControl(header, 0, 1);
+        grid.addControl(header, gridcount++, 1);
         var checkbox2 = new BABYLON.GUI.Checkbox();
         checkbox2.width = "20px";
         checkbox2.height = "20px";
@@ -644,40 +741,31 @@ var Game = /** @class */ (function () {
                 _this._scene.fogMode = BABYLON.Scene.FOGMODE_NONE;
             }
         });
-        grid.addControl(checkbox2, 1, 0);
+        grid.addControl(checkbox2, gridcount, 0);
         var header2 = BABYLON.GUI.Control.AddHeader(checkbox2, "Fog", "180px", { isHorizontal: true, controlFirst: true });
         header2.color = "white";
         header2.height = "20px";
         header2.horizontalAlignment = BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
-        grid.addControl(header2, 1, 1);
-        var checkbox3 = new BABYLON.GUI.Checkbox();
-        checkbox3.width = "20px";
-        checkbox3.height = "20px";
-        checkbox3.isChecked = true;
-        checkbox3.color = "green";
-        checkbox3.onIsCheckedChangedObservable.add(function (value) {
-            console.log("%c Camera:", "background: blue; color: white", value);
-            if (value) {
-                _this._camera.setPosition(_this._camera2.position);
-                _this._camera.rebuildAnglesAndRadius();
-                _this._camera2.detachControl(_this._canvas);
-                _this._camera.attachControl(_this._canvas, true, false);
-                _this._scene.activeCamera = _this._camera;
-            }
-            else {
-                _this._camera.detachControl(_this._canvas);
-                _this._camera2.attachControl(_this._canvas, true);
-                _this._camera2.position = _this._camera.position;
-                _this._camera2.setTarget(_this._camera.getTarget());
-                _this._scene.activeCamera = _this._camera2;
-            }
-        });
-        grid.addControl(checkbox3, 2, 0);
-        var header3 = BABYLON.GUI.Control.AddHeader(checkbox3, "Camera", "180px", { isHorizontal: true, controlFirst: true });
-        header3.color = "white";
-        header3.height = "20px";
-        header3.horizontalAlignment = BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
-        grid.addControl(header3, 2, 1);
+        grid.addControl(header2, gridcount++, 1);
+        this._camera.cameras.forEach(function (camera) {
+            var radio = new BABYLON.GUI.RadioButton();
+            radio.width = "20px";
+            radio.height = "20px";
+            radio.color = "green";
+            radio.isChecked = (camera.name === "ArcRotate");
+            radio.onIsCheckedChangedObservable.add(function (state) {
+                console.log(camera.name, state);
+                if (state) {
+                    _this._camera.setEnabled(camera);
+                }
+            });
+            grid.addControl(radio, gridcount, 0);
+            var radioHead = BABYLON.GUI.Control.AddHeader(radio, "Camera: " + camera.name, "180px", { isHorizontal: true, controlFirst: true });
+            radioHead.color = "white";
+            radioHead.height = "20px";
+            radioHead.horizontalAlignment = BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
+            grid.addControl(radioHead, gridcount++, 1);
+        }, this);
     };
     return Game;
 }());
