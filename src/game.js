@@ -525,7 +525,9 @@ var Game = /** @class */ (function () {
         this._camera.maxZ = 1000;
         this._camera.upperBetaLimit = (Math.PI / 2) - 0.1;
         this._camera.lowerRadiusLimit = 2;
-        this._camera.attachControl(this._canvas, true);
+        this._camera.attachControl(this._canvas, true, false);
+        this._scene.activeCamera = this._camera;
+        this._camera2 = new BABYLON.UniversalCamera("UniversalCamera", new BABYLON.Vector3(0, 0, -10), this._scene);
         // Ground
         var ground = BABYLON.Mesh.CreateGround("ground", 1000, 1000, 1, this._scene, false);
         var groundMaterial = new BABYLON.StandardMaterial("ground", this._scene);
@@ -544,12 +546,13 @@ var Game = /** @class */ (function () {
         // debugBase.receiveShadows = true;
         // Moving ball for the fox to watch.
         var targetHead = BABYLON.MeshBuilder.CreateSphere("targetHead", { diameterX: 0.01, diameterY: 0.01, diameterZ: 0.01 }, this._scene);
-        targetHead.position = this._camera.position.clone();
+        targetHead.position = this._light.position.clone();
         shadowGenerator.getShadowMap().renderList.push(targetHead);
         // Fox
         var fox = new Character(this._scene, shadowGenerator, FOX, function () {
             console.log("fox loaded");
-            _this._camera.target = fox.position;
+            _this._camera.setTarget(fox.position);
+            _this._camera2.setTarget(fox.position);
             fox.lookAt(targetHead.position);
             fox.rotation.y = Math.PI;
         });
@@ -602,6 +605,7 @@ var Game = /** @class */ (function () {
         grid.addColumnDefinition(100, true);
         grid.addRowDefinition(20, true);
         grid.addRowDefinition(20, true);
+        grid.addRowDefinition(20, true);
         advancedTexture.addControl(grid);
         var panel = new BABYLON.GUI.StackPanel();
         panel.width = "220px";
@@ -646,6 +650,34 @@ var Game = /** @class */ (function () {
         header2.height = "20px";
         header2.horizontalAlignment = BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
         grid.addControl(header2, 1, 1);
+        var checkbox3 = new BABYLON.GUI.Checkbox();
+        checkbox3.width = "20px";
+        checkbox3.height = "20px";
+        checkbox3.isChecked = true;
+        checkbox3.color = "green";
+        checkbox3.onIsCheckedChangedObservable.add(function (value) {
+            console.log("%c Camera:", "background: blue; color: white", value);
+            if (value) {
+                _this._camera.setPosition(_this._camera2.position);
+                _this._camera.rebuildAnglesAndRadius();
+                _this._camera2.detachControl(_this._canvas);
+                _this._camera.attachControl(_this._canvas, true, false);
+                _this._scene.activeCamera = _this._camera;
+            }
+            else {
+                _this._camera.detachControl(_this._canvas);
+                _this._camera2.attachControl(_this._canvas, true);
+                _this._camera2.position = _this._camera.position;
+                _this._camera2.setTarget(_this._camera.getTarget());
+                _this._scene.activeCamera = _this._camera2;
+            }
+        });
+        grid.addControl(checkbox3, 2, 0);
+        var header3 = BABYLON.GUI.Control.AddHeader(checkbox3, "Camera", "180px", { isHorizontal: true, controlFirst: true });
+        header3.color = "white";
+        header3.height = "20px";
+        header3.horizontalAlignment = BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
+        grid.addControl(header3, 2, 1);
     };
     return Game;
 }());
