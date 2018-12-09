@@ -1,4 +1,5 @@
 ///<reference path="3rdParty/babylon.gui.module.d.ts" />
+///<reference path="plantGenerator.ts" />
 
 let SCENEPATH = "scenes/";
 let FOX = "fox.babylon";
@@ -51,12 +52,17 @@ class Star {
     boxB.material = starMaterialR;
     boxC.material = starMaterialG;
     boxD.material = starMaterialB;
+
     this.mesh = BABYLON.Mesh.CreateBox("star", 1, this._scene);
     this.mesh.isVisible = false;
     boxA.parent = this.mesh;
     boxB.parent = this.mesh;
     boxC.parent = this.mesh;
     boxD.parent = this.mesh;
+
+    this.mesh.scaling.x = 0.5;
+    this.mesh.scaling.y = 0.5;
+    this.mesh.scaling.z = 0.5;
   }
 }
 
@@ -642,7 +648,7 @@ class Scenery {
                                                    0.2 + Math.random() * 0.2);
     leafMaterial.specularColor = BABYLON.Color3.Red();
 
-    let tree = simplePineGenerator(
+    let tree = PineGenerator(
       canopies, height, width, trunkMaterial, leafMaterial, this._scene);
     tree.setEnabled(false);
     tree.name += "_" + this._treeSpecies;

@@ -1,4 +1,5 @@
 ///<reference path="3rdParty/babylon.gui.module.d.ts" />
+///<reference path="plantGenerator.ts" />
 var SCENEPATH = "scenes/";
 var FOX = "fox.babylon";
 var SCALE = 100;
@@ -33,6 +34,9 @@ var Star = /** @class */ (function () {
         boxB.parent = this.mesh;
         boxC.parent = this.mesh;
         boxD.parent = this.mesh;
+        this.mesh.scaling.x = 0.5;
+        this.mesh.scaling.y = 0.5;
+        this.mesh.scaling.z = 0.5;
     }
     return Star;
 }());
@@ -480,7 +484,7 @@ var Scenery = /** @class */ (function () {
         var leafMaterial = new BABYLON.StandardMaterial("leaf", this._scene);
         leafMaterial.diffuseColor = new BABYLON.Color3(0.4 + Math.random() * 0.2, 0.5 + Math.random() * 0.4, 0.2 + Math.random() * 0.2);
         leafMaterial.specularColor = BABYLON.Color3.Red();
-        var tree = simplePineGenerator(canopies, height, width, trunkMaterial, leafMaterial, this._scene);
+        var tree = PineGenerator(canopies, height, width, trunkMaterial, leafMaterial, this._scene);
         tree.setEnabled(false);
         tree.name += "_" + this._treeSpecies;
         this._treeSpecies++;
