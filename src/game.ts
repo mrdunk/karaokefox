@@ -32,37 +32,25 @@ class Star {
     this._scene = scene;
     var gl = new BABYLON.GlowLayer("glow", this._scene);
 
+    let pyramidA =
+      BABYLON.MeshBuilder.CreatePolyhedron("pyramidA", {type: 0, size: 1}, this._scene);
+    let pyramidB =
+      BABYLON.MeshBuilder.CreatePolyhedron("pyramidB", {type: 0, size: 1}, this._scene);
+    pyramidB.rotate(BABYLON.Axis.Y, Math.PI);
+    
     let starMaterialW = new BABYLON.StandardMaterial("starMaterialW", this._scene);
     starMaterialW.emissiveColor = new BABYLON.Color3(1, 1, 1);
-    let starMaterialR = new BABYLON.StandardMaterial("starMaterialR", this._scene);
-    starMaterialR.emissiveColor = new BABYLON.Color3(1, 0.7, 0.7);
-    let starMaterialG = new BABYLON.StandardMaterial("starMaterialG", this._scene);
-    starMaterialG.emissiveColor = new BABYLON.Color3(0.7, 1, 0.7);
-    let starMaterialB = new BABYLON.StandardMaterial("starMaterialB", this._scene);
-    starMaterialB.emissiveColor = new BABYLON.Color3(0.7, 0.7, 1);
+    let starMaterialY = new BABYLON.StandardMaterial("starMaterialY", this._scene);
+    starMaterialY.emissiveColor = new BABYLON.Color3(0.5, 1, 1);
 
-    let boxA = BABYLON.MeshBuilder.CreateBox("boxA", {}, this._scene);
-    let boxB = BABYLON.MeshBuilder.CreateBox("boxB", {}, this._scene);
-    let boxC = BABYLON.MeshBuilder.CreateBox("boxC", {}, this._scene);
-    let boxD = BABYLON.MeshBuilder.CreateBox("boxD", {}, this._scene);
-    boxB.rotate(BABYLON.Axis.X, Math.PI / 4);
-    boxC.rotate(BABYLON.Axis.Y, Math.PI / 4);
-    boxD.rotate(BABYLON.Axis.Z, Math.PI / 4);
-    boxA.material = starMaterialW;
-    boxB.material = starMaterialR;
-    boxC.material = starMaterialG;
-    boxD.material = starMaterialB;
+    pyramidA.material = starMaterialW;
+    pyramidB.material = starMaterialY;
 
     this.mesh = BABYLON.Mesh.CreateBox("star", 1, this._scene);
     this.mesh.isVisible = false;
-    boxA.parent = this.mesh;
-    boxB.parent = this.mesh;
-    boxC.parent = this.mesh;
-    boxD.parent = this.mesh;
+    pyramidA.parent = this.mesh;
+    pyramidB.parent = this.mesh;
 
-    this.mesh.scaling.x = 0.5;
-    this.mesh.scaling.y = 0.5;
-    this.mesh.scaling.z = 0.5;
   }
 }
 
@@ -725,7 +713,7 @@ class Camera {
     this._target.position = new BABYLON.Vector3(100, 40, 100);
 
     this._cameraArc = new BABYLON.ArcRotateCamera(
-      "Camera", 0, 0, 2, new BABYLON.Vector3(0, 30, 0), this._scene);
+      "ArcRotateCamera", 0, 0, 2, new BABYLON.Vector3(0, 30, 0), this._scene);
     this._cameraArc.setPosition(new BABYLON.Vector3(5, 17, 30));
     this._cameraArc.minZ = 0.1;
     this._cameraArc.maxZ = 1000;
@@ -739,7 +727,7 @@ class Camera {
     this._cameraUniversal = new BABYLON.UniversalCamera(
       "UniversalCamera", new BABYLON.Vector3(0, 0, -10), this._scene);
     this._cameraUniversal.setTarget(this._target.position);
-    this.cameras.push({"name": "Univarsal", "camera": this._cameraUniversal});
+    this.cameras.push({"name": "Universal", "camera": this._cameraUniversal});
     
     this._scene.onBeforeRenderObservable.add(() => {
       if(this._cameraArc.getTarget() != this._target.position) {
@@ -776,7 +764,17 @@ class Camera {
   }
 
   setEnabled(camera: CameraDescription): void {
-    console.log(camera);
+    console.log(camera, this._scene.activeCamera.name);
+    if(this._scene.activeCamera.name == "UniversalCamera") {
+      // Move the camera target in front of old camera to allow for animation to
+      // new camera orientation.
+      let distance = BABYLON.Vector3.Distance(
+        this._cameraUniversal.position, this._cameraArc.target);
+      this._target.position = this._cameraUniversal.getFrontPosition(distance);
+      this.setTarget(new BABYLON.Vector3(0, 0, 0));
+    }
+
+    // Set the new camera.
     if(camera.name === "ArcRotate") {
       this._cameraArc.setPosition(this._cameraUniversal.position);
       this._cameraArc.rebuildAnglesAndRadius();
@@ -875,7 +873,7 @@ class Game {
     this._actors.push(fox);
     // Star
     let star = new Star(this._scene);
-    star.mesh.position = new BABYLON.Vector3(0, 2, 0);
+    star.mesh.position = new BABYLON.Vector3(0, 5, 0);
 
     let scenery = new Scenery(this._scene, shadowGenerator, 32);
     this._scene.onPointerDown = function (evt, pickResult) {

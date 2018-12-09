@@ -9,34 +9,19 @@ var Star = /** @class */ (function () {
     function Star(scene) {
         this._scene = scene;
         var gl = new BABYLON.GlowLayer("glow", this._scene);
+        var pyramidA = BABYLON.MeshBuilder.CreatePolyhedron("pyramidA", { type: 0, size: 1 }, this._scene);
+        var pyramidB = BABYLON.MeshBuilder.CreatePolyhedron("pyramidB", { type: 0, size: 1 }, this._scene);
+        pyramidB.rotate(BABYLON.Axis.Y, Math.PI);
         var starMaterialW = new BABYLON.StandardMaterial("starMaterialW", this._scene);
         starMaterialW.emissiveColor = new BABYLON.Color3(1, 1, 1);
-        var starMaterialR = new BABYLON.StandardMaterial("starMaterialR", this._scene);
-        starMaterialR.emissiveColor = new BABYLON.Color3(1, 0.7, 0.7);
-        var starMaterialG = new BABYLON.StandardMaterial("starMaterialG", this._scene);
-        starMaterialG.emissiveColor = new BABYLON.Color3(0.7, 1, 0.7);
-        var starMaterialB = new BABYLON.StandardMaterial("starMaterialB", this._scene);
-        starMaterialB.emissiveColor = new BABYLON.Color3(0.7, 0.7, 1);
-        var boxA = BABYLON.MeshBuilder.CreateBox("boxA", {}, this._scene);
-        var boxB = BABYLON.MeshBuilder.CreateBox("boxB", {}, this._scene);
-        var boxC = BABYLON.MeshBuilder.CreateBox("boxC", {}, this._scene);
-        var boxD = BABYLON.MeshBuilder.CreateBox("boxD", {}, this._scene);
-        boxB.rotate(BABYLON.Axis.X, Math.PI / 4);
-        boxC.rotate(BABYLON.Axis.Y, Math.PI / 4);
-        boxD.rotate(BABYLON.Axis.Z, Math.PI / 4);
-        boxA.material = starMaterialW;
-        boxB.material = starMaterialR;
-        boxC.material = starMaterialG;
-        boxD.material = starMaterialB;
+        var starMaterialY = new BABYLON.StandardMaterial("starMaterialY", this._scene);
+        starMaterialY.emissiveColor = new BABYLON.Color3(0.5, 1, 1);
+        pyramidA.material = starMaterialW;
+        pyramidB.material = starMaterialY;
         this.mesh = BABYLON.Mesh.CreateBox("star", 1, this._scene);
         this.mesh.isVisible = false;
-        boxA.parent = this.mesh;
-        boxB.parent = this.mesh;
-        boxC.parent = this.mesh;
-        boxD.parent = this.mesh;
-        this.mesh.scaling.x = 0.5;
-        this.mesh.scaling.y = 0.5;
-        this.mesh.scaling.z = 0.5;
+        pyramidA.parent = this.mesh;
+        pyramidB.parent = this.mesh;
     }
     return Star;
 }());
@@ -534,7 +519,7 @@ var Camera = /** @class */ (function () {
         this.cameras = [];
         this._target = BABYLON.MeshBuilder.CreateSphere("targetCamera", { diameterX: 0.1, diameterY: 0.1, diameterZ: 0.1 }, this._scene);
         this._target.position = new BABYLON.Vector3(100, 40, 100);
-        this._cameraArc = new BABYLON.ArcRotateCamera("Camera", 0, 0, 2, new BABYLON.Vector3(0, 30, 0), this._scene);
+        this._cameraArc = new BABYLON.ArcRotateCamera("ArcRotateCamera", 0, 0, 2, new BABYLON.Vector3(0, 30, 0), this._scene);
         this._cameraArc.setPosition(new BABYLON.Vector3(5, 17, 30));
         this._cameraArc.minZ = 0.1;
         this._cameraArc.maxZ = 1000;
@@ -546,7 +531,7 @@ var Camera = /** @class */ (function () {
         this.cameras.push({ "name": "ArcRotate", "camera": this._cameraArc });
         this._cameraUniversal = new BABYLON.UniversalCamera("UniversalCamera", new BABYLON.Vector3(0, 0, -10), this._scene);
         this._cameraUniversal.setTarget(this._target.position);
-        this.cameras.push({ "name": "Univarsal", "camera": this._cameraUniversal });
+        this.cameras.push({ "name": "Universal", "camera": this._cameraUniversal });
         this._scene.onBeforeRenderObservable.add(function () {
             if (_this._cameraArc.getTarget() != _this._target.position) {
                 _this._cameraArc.setTarget(_this._target.position);
@@ -571,7 +556,13 @@ var Camera = /** @class */ (function () {
         this._scene.beginAnimation(this._target, 0, 120, false);
     };
     Camera.prototype.setEnabled = function (camera) {
-        console.log(camera);
+        console.log(camera, this._scene.activeCamera.name);
+        if (this._scene.activeCamera.name == "UniversalCamera") {
+            console.log("***");
+            var distance = BABYLON.Vector3.Distance(this._cameraUniversal.position, this._cameraArc.target);
+            this._target.position = this._cameraUniversal.getFrontPosition(distance);
+            this.setTarget(new BABYLON.Vector3(0, 0, 0));
+        }
         if (camera.name === "ArcRotate") {
             this._cameraArc.setPosition(this._cameraUniversal.position);
             this._cameraArc.rebuildAnglesAndRadius();
@@ -653,7 +644,7 @@ var Game = /** @class */ (function () {
         this._actors.push(fox);
         // Star
         var star = new Star(this._scene);
-        star.mesh.position = new BABYLON.Vector3(0, 2, 0);
+        star.mesh.position = new BABYLON.Vector3(0, 5, 0);
         var scenery = new Scenery(this._scene, shadowGenerator, 32);
         this._scene.onPointerDown = function (evt, pickResult) {
             // if the click hits the ground object, we change the impact position

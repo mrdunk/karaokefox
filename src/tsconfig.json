@@ -6,7 +6,6 @@
     "module": "commonjs",
     "target": "ES5",
     "lib": [ "dom", "es2015", "es5", "es6"],
-    //"lib": [ "ES7", "DOM" ],
     "sourceMap": true
   },
   "exclude": [
