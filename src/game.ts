@@ -722,7 +722,7 @@ class Scenery {
 
     let decalMaterial = new BABYLON.StandardMaterial(flowers[image], this._scene);
     decalMaterial.diffuseTexture = new BABYLON.Texture(
-      "src/textures/groundcover/" + flowers[image], this._scene);
+      "textures/groundcover/" + flowers[image], this._scene);
 		decalMaterial.diffuseTexture.hasAlpha = true;
     decalMaterial.zOffset = -Math.round(this._groundCoverTypes.length / 2 +1);
     decalMaterial.specularColor = new BABYLON.Color3(0, 0, 0);
