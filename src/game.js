@@ -50,6 +50,7 @@ var Character = /** @class */ (function () {
             //this._mesh.scaling = new BABYLON.Vector3(SCALE, SCALE, SCALE);
             //this._mesh.receiveShadows = true;
             //this._mesh.convertToFlatShadedMesh();
+            this._mesh.material.zOffset = -100;
             if (this._shaddows) {
                 this._shaddows.getShadowMap().renderList.push(this._mesh);
             }
@@ -128,10 +129,10 @@ var Character = /** @class */ (function () {
                 //this._lookCtrlNeck.update();
                 //this._lookCtrlHead.update();
                 this._bones.neck.rotate(BABYLON.Axis.Z, -angleXY / 2, BABYLON.Space.LOCAL);
-                this._bones.neck.rotate(BABYLON.Axis.X, angleYZ / 2, BABYLON.Space.LOCAL);
+                this._bones.neck.rotate(BABYLON.Axis.X, angleYZ / 3, BABYLON.Space.LOCAL);
                 this._bones.neck.rotate(BABYLON.Axis.Y, -angleYZ * angleXY / (2 * Math.PI), BABYLON.Space.LOCAL);
                 this._bones.head.rotate(BABYLON.Axis.Z, -angleXY / 2, BABYLON.Space.LOCAL);
-                this._bones.head.rotate(BABYLON.Axis.X, angleYZ / 2, BABYLON.Space.LOCAL);
+                this._bones.head.rotate(BABYLON.Axis.X, angleYZ / 3, BABYLON.Space.LOCAL);
                 this._bones.head.rotate(BABYLON.Axis.Y, -angleYZ * angleXY / (2 * Math.PI), BABYLON.Space.LOCAL);
             }
         }.bind(this));
@@ -256,11 +257,14 @@ var SceneryCell = /** @class */ (function () {
     return SceneryCell;
 }());
 var Scenery = /** @class */ (function () {
-    function Scenery(scene, shaddows, size) {
+    function Scenery(scene, shaddows, ground, size) {
+        this._mapSpacing = 5;
         console.log("Mesh count before creating scenery: %c" +
             scene.meshes.length.toString(), "background: orange; color: white");
         this._scene = scene;
         this._shaddows = shaddows;
+        this._ground = ground;
+        this._groundCover = {};
         this._treeTypes = [];
         this._treeSpecies = 0;
         // Ensure there are always /some/ of each type of tree.
@@ -288,6 +292,15 @@ var Scenery = /** @class */ (function () {
         this._shrubTypes.push(this._createShrub());
         this._shrubTypes.push(this._createShrub());
         this._shrubTypes.push(this._createShrub());
+        this._groundCoverTypes = [];
+        this._groundCoverTypes.push(this._createGroundCover());
+        this._groundCoverTypes.push(this._createGroundCover());
+        this._groundCoverTypes.push(this._createGroundCover());
+        this._groundCoverTypes.push(this._createGroundCover());
+        this._groundCoverTypes.push(this._createGroundCover());
+        this._groundCoverTypes.push(this._createGroundCover());
+        this._groundCoverTypes.push(this._createGroundCover());
+        this._groundCoverTypes.push(this._createGroundCover());
         this._sideLen = size;
         this._sideMagnitude = Math.floor(Math.log(size) / Math.log(2));
         console.assert(Math.pow(2, this._sideMagnitude) === this._sideLen &&
@@ -332,31 +345,30 @@ var Scenery = /** @class */ (function () {
           }
           console.log(line);
         }*/
-        var treeSpacing = 5;
         var treeScale = 400;
         var trees = [];
         for (var x = 0; x < this._sideLen; x++) {
             for (var y = 0; y < this._sideLen; y++) {
                 var cell = this.getCell({ x: x, y: y, recursion: this._sideMagnitude });
-                if (cell.value > 100) {
+                if (cell.value > 150) {
                     var treeTypes = this._treeTypes.length;
                     var tree = this._treeTypes[(x + y) % treeTypes].clone(this._treeTypes[(x + y) % treeTypes].name + "_" + x + "_" + y);
                     //let tree = this._treeTypes[y % treeTypes].createInstance(
                     //  this._treeTypes[y % treeTypes].name + "_" + x + "_" + y);
-                    tree.position.x = (x - this._sideLen / 2 + Math.random()) * treeSpacing;
+                    tree.position.x = (x - this._sideLen / 2 + Math.random()) * this._mapSpacing;
                     tree.position.y = 0;
-                    tree.position.z = (y - this._sideLen / 2 + Math.random()) * treeSpacing;
+                    tree.position.z = (y - this._sideLen / 2 + Math.random()) * this._mapSpacing;
                     var scale = cell.value / treeScale;
                     tree.scaling = new BABYLON.Vector3(scale, scale, scale);
                     trees.push(tree);
                     //this._shaddows.getShadowMap().renderList.push(tree);
                 }
-                else if (cell.value > 50) {
+                else if (cell.value > 80) {
                     var shrubTypes = this._shrubTypes.length;
                     var shrub = this._shrubTypes[(y + x) % shrubTypes].clone(this._shrubTypes[(y + x) % shrubTypes].name + "_" + x + "_" + y);
-                    shrub.position.x = (x - this._sideLen / 2 + Math.random()) * treeSpacing;
+                    shrub.position.x = (x - this._sideLen / 2 + Math.random()) * this._mapSpacing;
                     shrub.position.y = 0;
-                    shrub.position.z = (y - this._sideLen / 2 + Math.random()) * treeSpacing;
+                    shrub.position.z = (y - this._sideLen / 2 + Math.random()) * this._mapSpacing;
                     var scale = cell.value / treeScale;
                     //shrub.scaling = new BABYLON.Vector3(scale, scale, scale);
                     shrub.scaling.x *= scale;
@@ -364,6 +376,7 @@ var Scenery = /** @class */ (function () {
                     shrub.scaling.z *= scale;
                     trees.push(shrub);
                 }
+                this._applyGroundCover((x - this._sideLen / 2) * this._mapSpacing, (y - this._sideLen / 2) * this._mapSpacing);
             }
         }
         // Don't need the prototypes any more so delete them.
@@ -509,6 +522,69 @@ var Scenery = /** @class */ (function () {
         this._treeSpecies++;
         return tree;
     };
+    Scenery.prototype._createGroundCover = function () {
+        var flowers = [
+            "greenery1.png",
+            "greenery2.png",
+            "greenery3.png",
+            "greenery4.png",
+            "greenery5.png",
+            "greenery6.png",
+            "greenery7.png",
+            "greenery8.png",
+        ];
+        var image = this._groundCoverTypes.length;
+        var decalMaterial = new BABYLON.StandardMaterial(flowers[image], this._scene);
+        decalMaterial.diffuseTexture = new BABYLON.Texture("/src/textures/groundcover/" + flowers[image], this._scene);
+        decalMaterial.diffuseTexture.hasAlpha = true;
+        decalMaterial.zOffset = -Math.round(this._groundCoverTypes.length / 2 + 1);
+        decalMaterial.specularColor = new BABYLON.Color3(0, 0, 0);
+        decalMaterial.disableDepthWrite = false;
+        decalMaterial.forceDepthWrite = true;
+        return decalMaterial;
+    };
+    Scenery.prototype._applyGroundCover = function (x, y) {
+        for (var i = 0; i < Math.random() * 3; i++) {
+            var decalScale = 10 + Math.random() * 20;
+            var decalSize = BABYLON.Vector3.One().scale(decalScale);
+            var decalRotate = Math.PI * 2 * Math.random();
+            var newDecal = BABYLON.MeshBuilder.CreateDecal("groundCover_" + x + "_" + y, this._ground, {
+                position: new BABYLON.Vector3(x, 0, y),
+                normal: new BABYLON.Vector3(0, 1, 0),
+                size: decalSize,
+                angle: decalRotate
+            });
+            var materialIndex = Math.round(Math.random() * (this._groundCoverTypes.length - 1));
+            var proposedMaterial = this._groundCoverTypes[materialIndex];
+            var decalHeight = proposedMaterial.zOffset;
+            // Check the proposed material does not clash with an overlapping material
+            // at the same zOffset.
+            var noConflict = true;
+            for (var decalCoverX = x - Math.round(decalScale / 2); decalCoverX < x + Math.round(decalScale / 2) && noConflict; decalCoverX++) {
+                for (var decalCoverY = y - Math.round(decalScale / 2); decalCoverY < y + Math.round(decalScale / 2); decalCoverY++) {
+                    var key = "" + decalCoverX + "_" + decalCoverY + "_" + decalHeight;
+                    if (this._groundCover[key]) {
+                        // Already exists.
+                        noConflict = false;
+                        break;
+                    }
+                }
+            }
+            if (noConflict) {
+                newDecal.material = proposedMaterial;
+                // Set a record of where this decal covers and at what zOffset.
+                for (var decalCoverX = x - Math.round(decalScale / 2); decalCoverX < x + Math.round(decalScale / 2) && noConflict; decalCoverX++) {
+                    for (var decalCoverY = y - Math.round(decalScale / 2); decalCoverY < y + Math.round(decalScale / 2); decalCoverY++) {
+                        var key = "" + decalCoverX + "_" + decalCoverY + "_" + decalHeight;
+                        this._groundCover[key] = true;
+                    }
+                }
+            }
+            else {
+                newDecal.dispose();
+            }
+        }
+    };
     return Scenery;
 }());
 var Camera = /** @class */ (function () {
@@ -521,8 +597,9 @@ var Camera = /** @class */ (function () {
         this._target.position = new BABYLON.Vector3(100, 40, 100);
         this._cameraArc = new BABYLON.ArcRotateCamera("ArcRotateCamera", 0, 0, 2, new BABYLON.Vector3(0, 30, 0), this._scene);
         this._cameraArc.setPosition(new BABYLON.Vector3(5, 17, 30));
-        this._cameraArc.minZ = 0.1;
-        this._cameraArc.maxZ = 1000;
+        this._cameraArc.minZ = 0.5;
+        this._cameraArc.maxZ = 800;
+        this._cameraArc.lowerBetaLimit = 0.1;
         this._cameraArc.upperBetaLimit = (Math.PI / 2) - 0.1;
         this._cameraArc.lowerRadiusLimit = 2;
         this._cameraArc.attachControl(this._canvas, true, false);
@@ -558,11 +635,13 @@ var Camera = /** @class */ (function () {
     Camera.prototype.setEnabled = function (camera) {
         console.log(camera, this._scene.activeCamera.name);
         if (this._scene.activeCamera.name == "UniversalCamera") {
-            console.log("***");
+            // Move the camera target in front of old camera to allow for animation to
+            // new camera orientation.
             var distance = BABYLON.Vector3.Distance(this._cameraUniversal.position, this._cameraArc.target);
             this._target.position = this._cameraUniversal.getFrontPosition(distance);
             this.setTarget(new BABYLON.Vector3(0, 0, 0));
         }
+        // Set the new camera.
         if (camera.name === "ArcRotate") {
             this._cameraArc.setPosition(this._cameraUniversal.position);
             this._cameraArc.rebuildAnglesAndRadius();
@@ -607,6 +686,7 @@ var Game = /** @class */ (function () {
         skyboxMaterial.disableLighting = true;
         skyboxMaterial.backFaceCulling = false;
         this._skybox.material = skyboxMaterial;
+        this._skybox.setEnabled(false);
         // Lighting
         this._light = new BABYLON.DirectionalLight("dir01", new BABYLON.Vector3(0, -0.5, -1.0), this._scene);
         this._light.position = new BABYLON.Vector3(20, 150, 70);
@@ -645,7 +725,7 @@ var Game = /** @class */ (function () {
         // Star
         var star = new Star(this._scene);
         star.mesh.position = new BABYLON.Vector3(0, 5, 0);
-        var scenery = new Scenery(this._scene, shadowGenerator, 32);
+        var scenery = new Scenery(this._scene, shadowGenerator, ground, 32);
         this._scene.onPointerDown = function (evt, pickResult) {
             // if the click hits the ground object, we change the impact position
             if (pickResult.hit) {
@@ -685,6 +765,9 @@ var Game = /** @class */ (function () {
         window.addEventListener('resize', function () {
             _this._engine.resize();
         });
+        window.addEventListener("orientationchange", function () {
+            _this._engine.resize();
+        });
     };
     Game.prototype.controlPannel = function () {
         var _this = this;
@@ -707,7 +790,7 @@ var Game = /** @class */ (function () {
         var checkbox = new BABYLON.GUI.Checkbox();
         checkbox.width = "20px";
         checkbox.height = "20px";
-        checkbox.isChecked = true;
+        checkbox.isChecked = false;
         checkbox.color = "green";
         checkbox.onIsCheckedChangedObservable.add(function (value) {
             console.log("%c SkyBox:", "background: blue; color: white", value);

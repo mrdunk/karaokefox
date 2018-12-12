@@ -4,7 +4,7 @@
 function PineGenerator(canopies: number, height: number, width: number,
                              trunkMaterial: BABYLON.StandardMaterial,
                              leafMaterial: BABYLON.StandardMaterial,
-                             scene: BABYLON.Scene) {
+                             scene: BABYLON.Scene) : BABYLON.Mesh {
 	let nbL = canopies + 1;
   let trunkLen = height / nbL;
 	let curvePoints = function(l, t) {
@@ -50,7 +50,7 @@ function QuickTreeGenerator(sizeBranch: number,
                             radius: number,
                             trunkMaterial: BABYLON.StandardMaterial,
                             leafMaterial: BABYLON.StandardMaterial,
-                            scene: BABYLON.Scene) {
+                            scene: BABYLON.Scene) : BABYLON.Mesh {
 
     let leaves = new BABYLON.Mesh("leaves", scene);
     
@@ -133,7 +133,7 @@ function QuickTreeGenerator(sizeBranch: number,
 
 function QuickShrub(sizeBranch: number,
                     leafMaterial: BABYLON.StandardMaterial,
-                    scene: BABYLON.Scene) {
+                    scene: BABYLON.Scene) : BABYLON.Mesh {
 
     let tree = new BABYLON.Mesh("shrub", scene);
     tree.isVisible = false;

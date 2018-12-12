@@ -105,6 +105,8 @@ class Character {
       //this._mesh.scaling = new BABYLON.Vector3(SCALE, SCALE, SCALE);
       //this._mesh.receiveShadows = true;
       //this._mesh.convertToFlatShadedMesh();
+      
+      this._mesh.material.zOffset = -100;
 
       if(this._shaddows) {
         this._shaddows.getShadowMap().renderList.push(this._mesh);
@@ -210,11 +212,11 @@ class Character {
         //this._lookCtrlNeck.update();
         //this._lookCtrlHead.update();
         this._bones.neck.rotate(BABYLON.Axis.Z, -angleXY / 2, BABYLON.Space.LOCAL);
-        this._bones.neck.rotate(BABYLON.Axis.X, angleYZ / 2, BABYLON.Space.LOCAL);
+        this._bones.neck.rotate(BABYLON.Axis.X, angleYZ / 3, BABYLON.Space.LOCAL);
         this._bones.neck.rotate(BABYLON.Axis.Y, -angleYZ * angleXY / (2 * Math.PI), BABYLON.Space.LOCAL);
 
         this._bones.head.rotate(BABYLON.Axis.Z, -angleXY / 2, BABYLON.Space.LOCAL);
-        this._bones.head.rotate(BABYLON.Axis.X, angleYZ / 2, BABYLON.Space.LOCAL);
+        this._bones.head.rotate(BABYLON.Axis.X, angleYZ / 3, BABYLON.Space.LOCAL);
         this._bones.head.rotate(BABYLON.Axis.Y, -angleYZ * angleXY / (2 * Math.PI), BABYLON.Space.LOCAL);
       }
     }.bind(this));
@@ -387,21 +389,28 @@ class SceneryCell {
 class Scenery {
   private _scene: BABYLON.Scene;
   private _shaddows: BABYLON.ShadowGenerator;
+  private _ground: BABYLON.Mesh;
   private _sideLen: number;
   private _sideMagnitude: number;
   private _cells: {[id: string] : SceneryCell};
   private _treeTypes: BABYLON.Mesh[];
   private _shrubTypes: BABYLON.Mesh[];
+  private _groundCoverTypes: BABYLON.StandardMaterial[];
+  private _groundCover: {[key: string]: boolean};
   private _treeSpecies: number;
+  private readonly _mapSpacing: number = 5;
 
   constructor(scene: BABYLON.Scene,
               shaddows: BABYLON.ShadowGenerator,
+              ground: BABYLON.Mesh,
               size: number) {
     console.log("Mesh count before creating scenery: %c" +
                 scene.meshes.length.toString(),
                 "background: orange; color: white");
     this._scene = scene;
     this._shaddows = shaddows;
+    this._ground = ground;
+    this._groundCover = {};
 
     this._treeTypes = [];
     this._treeSpecies = 0;
@@ -431,6 +440,16 @@ class Scenery {
     this._shrubTypes.push(this._createShrub());
     this._shrubTypes.push(this._createShrub());
     this._shrubTypes.push(this._createShrub());
+
+    this._groundCoverTypes = [];
+    this._groundCoverTypes.push(this._createGroundCover());
+    this._groundCoverTypes.push(this._createGroundCover());
+    this._groundCoverTypes.push(this._createGroundCover());
+    this._groundCoverTypes.push(this._createGroundCover());
+    this._groundCoverTypes.push(this._createGroundCover());
+    this._groundCoverTypes.push(this._createGroundCover());
+    this._groundCoverTypes.push(this._createGroundCover());
+    this._groundCoverTypes.push(this._createGroundCover());
 
     this._sideLen = size;
     this._sideMagnitude = Math.floor(Math.log(size) / Math.log(2));
@@ -478,32 +497,31 @@ class Scenery {
       console.log(line);
     }*/
     
-    let treeSpacing = 5;
     let treeScale = 400;
     let trees = [];
     for(let x = 0; x < this._sideLen; x++) {
       for(let y = 0; y < this._sideLen; y++) {
         let cell = this.getCell({x, y, recursion: this._sideMagnitude});
-        if(cell.value > 100) {
+        if(cell.value > 150) {
           let treeTypes = this._treeTypes.length;
           let tree = this._treeTypes[(x + y) % treeTypes].clone(
             this._treeTypes[(x + y) % treeTypes].name + "_" + x + "_" + y);
           //let tree = this._treeTypes[y % treeTypes].createInstance(
           //  this._treeTypes[y % treeTypes].name + "_" + x + "_" + y);
-          tree.position.x = (x - this._sideLen / 2 + Math.random()) * treeSpacing;
+          tree.position.x = (x - this._sideLen / 2 + Math.random()) * this._mapSpacing;
           tree.position.y = 0;
-          tree.position.z = (y - this._sideLen / 2 + Math.random()) * treeSpacing;
+          tree.position.z = (y - this._sideLen / 2 + Math.random()) * this._mapSpacing;
           let scale = cell.value / treeScale;
           tree.scaling = new BABYLON.Vector3(scale, scale, scale);
           trees.push(tree);
           //this._shaddows.getShadowMap().renderList.push(tree);
-        } else if(cell.value > 50) {
+        } else if(cell.value > 80) {
           let shrubTypes = this._shrubTypes.length;
           let shrub = this._shrubTypes[(y + x) % shrubTypes].clone(
             this._shrubTypes[(y + x) % shrubTypes].name + "_" + x + "_" + y);
-          shrub.position.x = (x - this._sideLen / 2 + Math.random()) * treeSpacing;
+          shrub.position.x = (x - this._sideLen / 2 + Math.random()) * this._mapSpacing;
           shrub.position.y = 0;
-          shrub.position.z = (y - this._sideLen / 2 + Math.random()) * treeSpacing;
+          shrub.position.z = (y - this._sideLen / 2 + Math.random()) * this._mapSpacing;
           let scale = cell.value / treeScale;
           //shrub.scaling = new BABYLON.Vector3(scale, scale, scale);
           shrub.scaling.x *= scale;
@@ -511,6 +529,8 @@ class Scenery {
           shrub.scaling.z *= scale;
           trees.push(shrub);
         }
+        this._applyGroundCover((x - this._sideLen / 2) * this._mapSpacing,
+                               (y - this._sideLen / 2) * this._mapSpacing);
       }
     }
     // Don't need the prototypes any more so delete them.
@@ -686,6 +706,87 @@ class Scenery {
     this._treeSpecies++;
     return tree;
   }
+
+  _createGroundCover() : BABYLON.StandardMaterial {
+    let flowers = [
+      "greenery1.png",
+      "greenery2.png",
+      "greenery3.png",
+      "greenery4.png",
+      "greenery5.png",
+      "greenery6.png",
+      "greenery7.png",
+      "greenery8.png",
+    ];
+    let image = this._groundCoverTypes.length;
+
+    let decalMaterial = new BABYLON.StandardMaterial(flowers[image], this._scene);
+    decalMaterial.diffuseTexture = new BABYLON.Texture(
+      "/src/textures/groundcover/" + flowers[image], this._scene);
+		decalMaterial.diffuseTexture.hasAlpha = true;
+    decalMaterial.zOffset = -Math.round(this._groundCoverTypes.length / 2 +1);
+    decalMaterial.specularColor = new BABYLON.Color3(0, 0, 0);
+      decalMaterial.disableDepthWrite = false;
+      decalMaterial.forceDepthWrite = true;
+
+    return decalMaterial;
+  }
+
+  _applyGroundCover(x: number, y: number) : void {
+    for(let i = 0; i < Math.random() * 3; i++) {
+      let decalScale = 10 + Math.random() * 20;
+      let decalSize = BABYLON.Vector3.One().scale(decalScale);
+      let decalRotate = Math.PI * 2 * Math.random();
+      let newDecal = BABYLON.MeshBuilder.CreateDecal(
+        "groundCover_" + x + "_" + y,
+        this._ground,
+        {
+          position: new BABYLON.Vector3(x, 0, y),
+         normal: new BABYLON.Vector3(0, 1, 0),
+         size: decalSize,
+         angle: decalRotate
+        });
+
+      let materialIndex = Math.round(Math.random() * (this._groundCoverTypes.length -1));
+      let proposedMaterial = this._groundCoverTypes[materialIndex];
+      let decalHeight = proposedMaterial.zOffset;
+
+      // Check the proposed material does not clash with an overlapping material
+      // at the same zOffset.
+      let noConflict = true;
+      for(let decalCoverX = x - Math.round(decalScale / 2);
+          decalCoverX < x + Math.round(decalScale / 2) && noConflict;
+          decalCoverX++) {
+        for(let decalCoverY = y - Math.round(decalScale / 2);
+            decalCoverY < y + Math.round(decalScale / 2);
+            decalCoverY++) {
+          let key = "" + decalCoverX + "_" + decalCoverY + "_" + decalHeight;
+          if(this._groundCover[key]) {
+            // Already exists.
+            noConflict = false;
+            break;
+          }
+        }
+      }
+      
+      if(noConflict) {
+        newDecal.material = proposedMaterial;
+        // Set a record of where this decal covers and at what zOffset.
+        for(let decalCoverX = x - Math.round(decalScale / 2);
+            decalCoverX < x + Math.round(decalScale / 2) && noConflict;
+            decalCoverX++) {
+          for(let decalCoverY = y - Math.round(decalScale / 2);
+              decalCoverY < y + Math.round(decalScale / 2);
+              decalCoverY++) {
+            let key = "" + decalCoverX + "_" + decalCoverY + "_" + decalHeight;
+            this._groundCover[key] = true;
+          }
+        }
+      } else {
+        newDecal.dispose();
+      }
+    }
+  }
 }
 
 interface CameraDescription {
@@ -715,8 +816,9 @@ class Camera {
     this._cameraArc = new BABYLON.ArcRotateCamera(
       "ArcRotateCamera", 0, 0, 2, new BABYLON.Vector3(0, 30, 0), this._scene);
     this._cameraArc.setPosition(new BABYLON.Vector3(5, 17, 30));
-    this._cameraArc.minZ = 0.1;
-    this._cameraArc.maxZ = 1000;
+    this._cameraArc.minZ = 0.5;
+    this._cameraArc.maxZ = 800;
+    this._cameraArc.lowerBetaLimit = 0.1;
     this._cameraArc.upperBetaLimit = (Math.PI / 2) - 0.1;
     this._cameraArc.lowerRadiusLimit = 2;
     this._cameraArc.attachControl(this._canvas, true, false);
@@ -828,6 +930,7 @@ class Game {
     skyboxMaterial.disableLighting = true;
     skyboxMaterial.backFaceCulling = false;
     this._skybox.material = skyboxMaterial;
+    this._skybox.setEnabled(false);
 
 		// Lighting
     this._light = new BABYLON.DirectionalLight(
@@ -875,7 +978,7 @@ class Game {
     let star = new Star(this._scene);
     star.mesh.position = new BABYLON.Vector3(0, 5, 0);
 
-    let scenery = new Scenery(this._scene, shadowGenerator, 32);
+    let scenery = new Scenery(this._scene, shadowGenerator, ground, 32);
     this._scene.onPointerDown = function (evt, pickResult) {
         // if the click hits the ground object, we change the impact position
         if (pickResult.hit) {
@@ -920,6 +1023,9 @@ class Game {
     window.addEventListener('resize', () => {
       this._engine.resize();
     });
+    window.addEventListener("orientationchange", () => {
+      this._engine.resize();
+    });
   }
 
   controlPannel() : void {
@@ -945,7 +1051,7 @@ class Game {
     let checkbox = new BABYLON.GUI.Checkbox();
     checkbox.width = "20px";
     checkbox.height = "20px";
-    checkbox.isChecked = true;
+    checkbox.isChecked = false;
     checkbox.color = "green";
     checkbox.onIsCheckedChangedObservable.add((value) => {
 			console.log("%c SkyBox:", "background: blue; color: white", value);
