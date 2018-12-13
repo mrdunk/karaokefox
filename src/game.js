@@ -34,16 +34,17 @@ var Star = /** @class */ (function () {
         });
     }
     Star.prototype.randomWalk = function () {
-        var cellHeight = this._scenery.getCellWorld({ x: this.mesh.position.x, y: this.mesh.position.z })
-            .maxHeight * this._scenery._mapSpacing || 0;
-        this._heightDiff = (cellHeight - this.mesh.position.y) / 3 + 5;
-        //console.log(this._heightDiff, cellHeight, this.mesh.position.y);
+        var cellHeight = this._scenery.getHeightWorld({ x: this.mesh.position.x, y: this.mesh.position.z }) || 0;
+        this._heightDiff = (cellHeight - this.mesh.position.y) / 3 + 1;
         var distanceToMapCenter = Math.abs(this.mesh.position.x) + Math.abs(this.mesh.position.z);
         var angleToMapCenter = Math.atan2(this.mesh.position.x, this.mesh.position.z) + Math.PI;
         if (angleToMapCenter > 2 * Math.PI) {
             angleToMapCenter -= 2 * Math.PI;
         }
         var fps = this._scene.getEngine().getFps();
+        if (fps <= 0) {
+            fps = 60;
+        }
         this._headingDiff /= 1.01;
         var biasToCenter = angleToMapCenter < this._heading ? -0.0001 : 0.0001;
         biasToCenter *= distanceToMapCenter / 100;
@@ -313,6 +314,7 @@ var SceneryCell = /** @class */ (function () {
 var Scenery = /** @class */ (function () {
     function Scenery(scene, shaddows, ground, size) {
         this._mapSpacing = 5;
+        this._treeScale = 400;
         console.log("Mesh count before creating scenery: %c" +
             scene.meshes.length.toString(), "background: orange; color: white");
         this._scene = scene;
@@ -367,7 +369,7 @@ var Scenery = /** @class */ (function () {
             if (recursion > this._deepestRecursionFound) {
                 this._deepestRecursionFound = recursion;
             }
-            console.log(p, segmentSize, recursion);
+            //console.log(p, segmentSize, recursion);
             for (var x = 0; x < this._sideLen; x += segmentSize) {
                 for (var y = 0; y < this._sideLen; y += segmentSize) {
                     if (this.getCell({ x: x, y: y, recursion: recursion }) === undefined) {
@@ -403,47 +405,81 @@ var Scenery = /** @class */ (function () {
           }
           console.log(line);
         }*/
-        var treeScale = 400;
         var trees = [];
         for (var x = 0; x < this._sideLen; x++) {
             for (var y = 0; y < this._sideLen; y++) {
                 var cell = this.getCell({ x: x, y: y, recursion: this._sideMagnitude });
-                var scale = cell.value / treeScale;
+                var scale = cell.value / this._treeScale;
                 var tree = void 0;
                 if (cell.value > 150) {
-                    var treeTypes = this._treeTypes.length;
-                    tree = this._treeTypes[(x + y) % treeTypes].clone(this._treeTypes[(x + y) % treeTypes].name + "_" + x + "_" + y);
+                    var treeTypeIndex = Math.round(Math.random() * (this._treeTypes.length - 1));
+                    console.log(treeTypeIndex, this._treeTypes.length);
+                    tree = this._treeTypes[treeTypeIndex].clone(this._treeTypes[treeTypeIndex].name + "_" + x + "_" + y);
                 }
-                else if (cell.value > 80) {
+                else if (cell.value > 100) {
                     var shrubTypes = this._shrubTypes.length;
-                    tree = this._shrubTypes[(y + x) % shrubTypes].clone(this._shrubTypes[(y + x) % shrubTypes].name + "_" + x + "_" + y);
+                    var shrubTypeIndex = Math.round(Math.random() * (this._shrubTypes.length - 1));
+                    tree = this._shrubTypes[shrubTypeIndex].clone(this._shrubTypes[shrubTypeIndex].name + "_" + x + "_" + y);
                 }
                 if (tree !== undefined) {
-                    tree.position.x = (x - this._sideLen / 2 + Math.random()) * this._mapSpacing;
+                    tree.position.x = (x - this._sideLen / 2 /*+ Math.random() - 0.5*/) * this._mapSpacing;
                     tree.position.y = 0;
-                    tree.position.z = (y - this._sideLen / 2 + Math.random()) * this._mapSpacing;
+                    tree.position.z = (y - this._sideLen / 2 /*+ Math.random() - 0.5*/) * this._mapSpacing;
                     tree.scaling = new BABYLON.Vector3(scale, scale, scale);
                     trees.push(tree);
-                    var treeTop = tree.getChildMeshes(true, function (mesh) {
+                    var leaves = tree.getChildMeshes(true, function (mesh) {
                         return mesh.name.split(".")[1] === "leaves";
-                    })[0]
-                        .getBoundingInfo().boundingBox.maximumWorld.y;
-                    cell.maxHeight = treeTop / this._mapSpacing;
-                    /*this._applyGroundCover((x - this._sideLen / 2) * this._mapSpacing,
-                      (y - this._sideLen / 2) * this._mapSpacing);
-                    let testTreetop = BABYLON.MeshBuilder.CreateSphere(
-                      "test" + x + "_" + y + " " + this._sideMagnitude, {}, this._scene);
+                    })[0].getBoundingInfo().boundingBox;
+                    var treeTop = leaves.maximumWorld.y;
+                    var xMin = Math.round(leaves.minimumWorld.x / this._mapSpacing);
+                    var xMax = Math.round(leaves.maximumWorld.x / this._mapSpacing);
+                    var yMin = Math.round(leaves.minimumWorld.z / this._mapSpacing);
+                    var yMax = Math.round(leaves.maximumWorld.z / this._mapSpacing);
+                    for (var xx = xMin + x; xx <= xMax + x; xx++) {
+                        for (var yy = yMin + y; yy <= yMax + y; yy++) {
+                            var c = this.getCell({ x: xx, y: yy, recursion: this._sideMagnitude });
+                            if (c && (!c.maxHeight || c.maxHeight < treeTop * scale)) {
+                                c.maxHeight = treeTop * scale;
+                            }
+                        }
+                    }
+                    //cell.maxHeight = treeTop * scale;
+                    /*console.log(xMin, xMax, yMin, yMax);
+                    let testTreetop = BABYLON.MeshBuilder.CreateBox("test",
+                      {"width": (xMax - xMin) * scale * this._mapSpacing,
+                       "height": treeTop * scale,
+                       "depth": (yMax - yMin) * scale * this._mapSpacing},
+                      this._scene);
+                    var material = new BABYLON.StandardMaterial("myMaterial", scene);
+                    material.diffuseColor = new BABYLON.Color3(1, 0, 0);
+                    material.wireframe = true;
+                    testTreetop.material = material;
                     testTreetop.position.x = (x - this._sideLen / 2) * this._mapSpacing;
-                    testTreetop.position.y = treeTop * scale;
+                    testTreetop.position.y = treeTop * scale / 2;
                     testTreetop.position.z = (y - this._sideLen / 2) * this._mapSpacing;*/
+                    this._applyGroundCover((x - this._sideLen / 2) * this._mapSpacing, (y - this._sideLen / 2) * this._mapSpacing);
                 }
             }
         }
+        /*for(let x = 0; x < this._sideLen; x++) {
+        for(let y = 0; y < this._sideLen; y++) {
+          let cell = this.getCell({x, y, recursion: this._sideMagnitude});
+          let scale = cell.value / this._treeScale;
+          let treeTop = cell.maxHeight;
+          let testTreetop = BABYLON.MeshBuilder.CreatePlane(
+            "test" + x + "_" + y + " " + this._sideMagnitude,
+            {size: this._sideMagnitude, sideOrientation: BABYLON.Mesh.DOUBLESIDE},
+            this._scene);
+          testTreetop.rotation.x = Math.PI / 2;
+          testTreetop.position.x = (x - this._sideLen / 2) * this._mapSpacing;
+          testTreetop.position.y = treeTop;
+          testTreetop.position.z = (y - this._sideLen / 2) * this._mapSpacing;
+        }
+      }*/
         // Don't need the prototypes any more so delete them.
         this._treeTypes.forEach(function (node) { node.dispose(); });
         this._shrubTypes.forEach(function (node) { node.dispose(); });
         this._consolidateTrees(trees);
-        //this._trees = BABYLON.Mesh.MergeMeshes(trees, true, true, null, true);
         //this._shaddows.getShadowMap().renderList.push(this._trees);
     }
     Scenery.prototype.setCell = function (coord, value) {
@@ -456,6 +492,13 @@ var Scenery = /** @class */ (function () {
             return this._cells["0,0|0"];
         }
         return this._cells["" + coord.x + "," + coord.y + "|" + coord.recursion];
+    };
+    Scenery.prototype.getHeightWorld = function (coord) {
+        var cell = this.getCellWorld(coord);
+        if (!cell) {
+            return 0;
+        }
+        return cell.maxHeight;
     };
     Scenery.prototype.getCellWorld = function (coord) {
         var x = Math.round(coord.x / this._mapSpacing + this._sideLen / 2);
@@ -512,7 +555,7 @@ var Scenery = /** @class */ (function () {
         });
         // Combine all trunks of the same species together.
         treeTrunkBucket.forEach(function (bucket) {
-            if (bucket.length) {
+            if (bucket && bucket.length) {
                 countStart += bucket.length;
                 countFinal++;
                 var t = BABYLON.Mesh.MergeMeshes(bucket, true, true, null, true);
@@ -521,7 +564,7 @@ var Scenery = /** @class */ (function () {
         }, this);
         // Combine all leaves of the same species together.
         treeFoliageBucket.forEach(function (bucket) {
-            if (bucket.length) {
+            if (bucket && bucket.length) {
                 countStart += bucket.length;
                 countFinal++;
                 var t = BABYLON.Mesh.MergeMeshes(bucket, true, true, null, true);
@@ -614,7 +657,7 @@ var Scenery = /** @class */ (function () {
     };
     Scenery.prototype._applyGroundCover = function (x, y) {
         for (var i = 0; i < Math.random() * 3; i++) {
-            var decalScale = 10 + Math.random() * 20;
+            var decalScale = 20 + Math.random() * 40;
             var decalSize = BABYLON.Vector3.One().scale(decalScale);
             var decalRotate = Math.PI * 2 * Math.random();
             var newDecal = BABYLON.MeshBuilder.CreateDecal("groundCover_" + x + "_" + y, this._ground, {
