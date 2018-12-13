@@ -6,8 +6,15 @@ var SCALE = 100;
 var ANIM_MERGE_RATE = 0.05;
 var SCENERY_RECURSION = 8;
 var Star = /** @class */ (function () {
-    function Star(scene) {
+    function Star(scene, scenery) {
+        var _this = this;
         this._scene = scene;
+        this._scenery = scenery;
+        this._heading = 0;
+        this._headingDiff = 0.001;
+        this._speed = 1;
+        this._speedMax = 10;
+        this._heightDiff = 0;
         var gl = new BABYLON.GlowLayer("glow", this._scene);
         var pyramidA = BABYLON.MeshBuilder.CreatePolyhedron("pyramidA", { type: 0, size: 1 }, this._scene);
         var pyramidB = BABYLON.MeshBuilder.CreatePolyhedron("pyramidB", { type: 0, size: 1 }, this._scene);
@@ -22,7 +29,53 @@ var Star = /** @class */ (function () {
         this.mesh.isVisible = false;
         pyramidA.parent = this.mesh;
         pyramidB.parent = this.mesh;
+        this._scene.registerBeforeRender(function () {
+            _this.randomWalk();
+        });
     }
+    Star.prototype.randomWalk = function () {
+        var cellHeight = this._scenery.getCellWorld({ x: this.mesh.position.x, y: this.mesh.position.z })
+            .maxHeight * this._scenery._mapSpacing || 0;
+        this._heightDiff = (cellHeight - this.mesh.position.y) / 3 + 5;
+        console.log(this._heightDiff, cellHeight, this.mesh.position.y);
+        var distanceToMapCenter = Math.abs(this.mesh.position.x) + Math.abs(this.mesh.position.z);
+        var angleToMapCenter = Math.atan2(this.mesh.position.x, this.mesh.position.z) + Math.PI;
+        if (angleToMapCenter > 2 * Math.PI) {
+            angleToMapCenter -= 2 * Math.PI;
+        }
+        var fps = this._scene.getEngine().getFps();
+        this._headingDiff /= 1.01;
+        var biasToCenter = angleToMapCenter < this._heading ? -0.0001 : 0.0001;
+        biasToCenter *= distanceToMapCenter / 100;
+        this._headingDiff += biasToCenter;
+        this._headingDiff += (Math.random() - 0.5) / 10 / fps;
+        this.turn(this._headingDiff);
+        this.moveForwards();
+    };
+    Star.prototype.moveForwards = function () {
+        var fps = this._scene.getEngine().getFps();
+        this.mesh.position.x += this._speed * Math.sin(this._heading) / fps;
+        this.mesh.position.z += this._speed * Math.cos(this._heading) / fps;
+        this.mesh.position.y += this._heightDiff / fps;
+    };
+    Star.prototype.turn = function (angle) {
+        this._heading += angle;
+        if (this._heading < 0) {
+            this._heading += 2 * Math.PI;
+        }
+        if (this._heading > 2 * Math.PI) {
+            this._heading -= 2 * Math.PI;
+        }
+    };
+    Star.prototype.modifySpeed = function (diff) {
+        this._speed += diff;
+        if (this._speed < 0) {
+            this._speed = 0;
+        }
+        if (this._speed > this._speedMax) {
+            this._speed = this._speedMax;
+        }
+    };
     return Star;
 }());
 var Character = /** @class */ (function () {
@@ -38,6 +91,7 @@ var Character = /** @class */ (function () {
         BABYLON.SceneLoader.ImportMesh("", SCENEPATH, filename, this._scene, this.onSceneLoad.bind(this));
     }
     Character.prototype.onSceneLoad = function (meshes, particleSystems, skeletons) {
+        var _this = this;
         try {
             console.assert(meshes.length === 1);
             console.assert(particleSystems.length === 0);
@@ -87,18 +141,18 @@ var Character = /** @class */ (function () {
             this._lookCtrlNeck = new BABYLON.BoneLookController(this._mesh, this._bones.neck, this._lookAtNeck, { adjustPitch: Math.PI / 2 });
             // Periodic updates.
             this._scene.registerBeforeRender(function () {
-                if (!this.position.equals(this._mesh.position)) {
-                    this._mesh.position.x = this.position.x;
-                    this._mesh.position.y = this.position.y;
-                    this._mesh.position.z = this.position.z;
+                if (!_this.position.equals(_this._mesh.position)) {
+                    _this._mesh.position.x = _this.position.x;
+                    _this._mesh.position.y = _this.position.y;
+                    _this._mesh.position.z = _this.position.z;
                 }
-                if (!this.rotation.equals(this._mesh.rotation)) {
-                    this._mesh.rotation.x = this.rotation.x;
-                    this._mesh.rotation.y = this.rotation.y;
-                    this._mesh.rotation.z = this.rotation.z;
+                if (!_this.rotation.equals(_this._mesh.rotation)) {
+                    _this._mesh.rotation.x = _this.rotation.x;
+                    _this._mesh.rotation.y = _this.rotation.y;
+                    _this._mesh.rotation.z = _this.rotation.z;
                 }
-                this._playAnimation();
-            }.bind(this));
+                _this._playAnimation();
+            });
             if (this._onLoaded) {
                 this._onLoaded();
             }
@@ -263,6 +317,7 @@ var Scenery = /** @class */ (function () {
             scene.meshes.length.toString(), "background: orange; color: white");
         this._scene = scene;
         this._shaddows = shaddows;
+        this._deepestRecursionFound = 0;
         this._ground = ground;
         this._groundCover = {};
         this._treeTypes = [];
@@ -309,7 +364,10 @@ var Scenery = /** @class */ (function () {
         for (var p = this._sideMagnitude; p >= 0; p--) {
             var segmentSize = Math.pow(2, p);
             var recursion = this._sideMagnitude - p;
-            // console.log(p, segmentSize, recursion);
+            if (recursion > this._deepestRecursionFound) {
+                this._deepestRecursionFound = recursion;
+            }
+            console.log(p, segmentSize, recursion);
             for (var x = 0; x < this._sideLen; x += segmentSize) {
                 for (var y = 0; y < this._sideLen; y += segmentSize) {
                     if (this.getCell({ x: x, y: y, recursion: recursion }) === undefined) {
@@ -350,33 +408,35 @@ var Scenery = /** @class */ (function () {
         for (var x = 0; x < this._sideLen; x++) {
             for (var y = 0; y < this._sideLen; y++) {
                 var cell = this.getCell({ x: x, y: y, recursion: this._sideMagnitude });
+                var scale = cell.value / treeScale;
+                var tree = void 0;
                 if (cell.value > 150) {
                     var treeTypes = this._treeTypes.length;
-                    var tree = this._treeTypes[(x + y) % treeTypes].clone(this._treeTypes[(x + y) % treeTypes].name + "_" + x + "_" + y);
-                    //let tree = this._treeTypes[y % treeTypes].createInstance(
-                    //  this._treeTypes[y % treeTypes].name + "_" + x + "_" + y);
-                    tree.position.x = (x - this._sideLen / 2 + Math.random()) * this._mapSpacing;
-                    tree.position.y = 0;
-                    tree.position.z = (y - this._sideLen / 2 + Math.random()) * this._mapSpacing;
-                    var scale = cell.value / treeScale;
-                    tree.scaling = new BABYLON.Vector3(scale, scale, scale);
-                    trees.push(tree);
-                    //this._shaddows.getShadowMap().renderList.push(tree);
+                    tree = this._treeTypes[(x + y) % treeTypes].clone(this._treeTypes[(x + y) % treeTypes].name + "_" + x + "_" + y);
                 }
                 else if (cell.value > 80) {
                     var shrubTypes = this._shrubTypes.length;
-                    var shrub = this._shrubTypes[(y + x) % shrubTypes].clone(this._shrubTypes[(y + x) % shrubTypes].name + "_" + x + "_" + y);
-                    shrub.position.x = (x - this._sideLen / 2 + Math.random()) * this._mapSpacing;
-                    shrub.position.y = 0;
-                    shrub.position.z = (y - this._sideLen / 2 + Math.random()) * this._mapSpacing;
-                    var scale = cell.value / treeScale;
-                    //shrub.scaling = new BABYLON.Vector3(scale, scale, scale);
-                    shrub.scaling.x *= scale;
-                    shrub.scaling.y *= scale;
-                    shrub.scaling.z *= scale;
-                    trees.push(shrub);
+                    tree = this._shrubTypes[(y + x) % shrubTypes].clone(this._shrubTypes[(y + x) % shrubTypes].name + "_" + x + "_" + y);
                 }
-                this._applyGroundCover((x - this._sideLen / 2) * this._mapSpacing, (y - this._sideLen / 2) * this._mapSpacing);
+                if (tree !== undefined) {
+                    tree.position.x = (x - this._sideLen / 2 + Math.random()) * this._mapSpacing;
+                    tree.position.y = 0;
+                    tree.position.z = (y - this._sideLen / 2 + Math.random()) * this._mapSpacing;
+                    tree.scaling = new BABYLON.Vector3(scale, scale, scale);
+                    trees.push(tree);
+                    var treeTop = tree.getChildMeshes(true, function (mesh) {
+                        return mesh.name.split(".")[1] === "leaves";
+                    })[0]
+                        .getBoundingInfo().boundingBox.maximumWorld.y;
+                    cell.maxHeight = treeTop / this._mapSpacing;
+                    /*this._applyGroundCover((x - this._sideLen / 2) * this._mapSpacing,
+                      (y - this._sideLen / 2) * this._mapSpacing);
+                    let testTreetop = BABYLON.MeshBuilder.CreateSphere(
+                      "test" + x + "_" + y + " " + this._sideMagnitude, {}, this._scene);
+                    testTreetop.position.x = (x - this._sideLen / 2) * this._mapSpacing;
+                    testTreetop.position.y = treeTop * scale;
+                    testTreetop.position.z = (y - this._sideLen / 2) * this._mapSpacing;*/
+                }
             }
         }
         // Don't need the prototypes any more so delete them.
@@ -396,6 +456,15 @@ var Scenery = /** @class */ (function () {
             return this._cells["0,0|0"];
         }
         return this._cells["" + coord.x + "," + coord.y + "|" + coord.recursion];
+    };
+    Scenery.prototype.getCellWorld = function (coord) {
+        var x = Math.round(coord.x / this._mapSpacing + this._sideLen / 2);
+        var y = Math.round(coord.y / this._mapSpacing + this._sideLen / 2);
+        var recursion = coord.recursion;
+        if (recursion === undefined) {
+            recursion = this._deepestRecursionFound;
+        }
+        return this.getCell({ x: x, y: y, recursion: recursion });
     };
     Scenery.prototype.getCellParent = function (coord) {
         var cell = this.getCell(coord);
@@ -706,6 +775,16 @@ var Game = /** @class */ (function () {
         ground.receiveShadows = true;
         // Shadows
         var shadowGenerator = new BABYLON.ShadowGenerator(1024, this._light);
+        // Scenery
+        var scenery = new Scenery(this._scene, shadowGenerator, ground, 32);
+        this._scene.onPointerDown = function (evt, pickResult) {
+            // if the click hits the ground object, we change the impact position
+            if (pickResult.hit) {
+                targetHead.position.x = pickResult.pickedPoint.x;
+                targetHead.position.y = pickResult.pickedPoint.y;
+                targetHead.position.z = pickResult.pickedPoint.z;
+            }
+        };
         // Meshes
         // World positions: (l/r, u/d, f/b)
         // let debugBase = BABYLON.MeshBuilder.CreateBox("debugBase", {height: 0.01, width: 0.5, depth: 1}, this._scene);
@@ -723,17 +802,8 @@ var Game = /** @class */ (function () {
         });
         this._actors.push(fox);
         // Star
-        var star = new Star(this._scene);
+        var star = new Star(this._scene, scenery);
         star.mesh.position = new BABYLON.Vector3(0, 5, 0);
-        var scenery = new Scenery(this._scene, shadowGenerator, ground, 32);
-        this._scene.onPointerDown = function (evt, pickResult) {
-            // if the click hits the ground object, we change the impact position
-            if (pickResult.hit) {
-                targetHead.position.x = pickResult.pickedPoint.x;
-                targetHead.position.y = pickResult.pickedPoint.y;
-                targetHead.position.z = pickResult.pickedPoint.z;
-            }
-        };
         setTimeout(function () {
             console.log("Add animations.");
             //this._animationQueue.push({name: "stationary", loop: false, reversed: false});

@@ -20,16 +20,29 @@ interface AnimateRequest {
 interface Coord {
   x: number;
   y: number;
-  recursion: number;
+  recursion?: number;
 }
 
 class Star {
   private _scene: BABYLON.Scene;
+  private _scenery: Scenery;
+  private _heading: number;
+  private _headingDiff: number;
+  private _speed: number;
+  private _speedMax: number;
+  private _heightDiff: number;
   
   mesh: BABYLON.Mesh;
 
-  constructor(scene: BABYLON.Scene) {
+  constructor(scene: BABYLON.Scene, scenery: Scenery) {
     this._scene = scene;
+    this._scenery = scenery;
+    this._heading = 0;
+    this._headingDiff = 0.001;
+    this._speed = 1;
+    this._speedMax = 10;
+    this._heightDiff = 0;
+
     var gl = new BABYLON.GlowLayer("glow", this._scene);
 
     let pyramidA =
@@ -51,6 +64,61 @@ class Star {
     pyramidA.parent = this.mesh;
     pyramidB.parent = this.mesh;
 
+    this._scene.registerBeforeRender(() => {
+      this.randomWalk();
+    });
+  }
+
+  randomWalk() : void {
+    let cellHeight = 
+      this._scenery.getCellWorld({x: this.mesh.position.x, y: this.mesh.position.z})
+      .maxHeight * this._scenery._mapSpacing || 0;
+    this._heightDiff = (cellHeight - this.mesh.position.y) / 3 +5;
+    //console.log(this._heightDiff, cellHeight, this.mesh.position.y);
+
+    let distanceToMapCenter = Math.abs(this.mesh.position.x) + Math.abs(this.mesh.position.z);
+    let angleToMapCenter = Math.atan2(this.mesh.position.x, this.mesh.position.z) + Math.PI;
+    if(angleToMapCenter > 2 * Math.PI) {
+      angleToMapCenter -= 2 * Math.PI;
+    }
+
+    let fps = this._scene.getEngine().getFps();
+    this._headingDiff /= 1.01;
+
+    let biasToCenter = angleToMapCenter < this._heading? -0.0001 : 0.0001;
+    biasToCenter *= distanceToMapCenter / 100;
+    this._headingDiff += biasToCenter;
+    this._headingDiff += (Math.random() - 0.5) / 10 / fps;
+    this.turn(this._headingDiff);
+    this.moveForwards();
+  }
+
+  moveForwards() : void {
+    let fps = this._scene.getEngine().getFps();
+    this.mesh.position.x += this._speed * Math.sin(this._heading) / fps;
+    this.mesh.position.z += this._speed * Math.cos(this._heading) / fps;
+
+    this.mesh.position.y += this._heightDiff / fps;
+  }
+
+  turn(angle: number) : void {
+    this._heading += angle;
+    if(this._heading < 0) {
+      this._heading += 2 * Math.PI;
+    }
+    if(this._heading > 2 * Math.PI) {
+      this._heading -= 2 * Math.PI;
+    }
+  }
+
+  modifySpeed(diff: number) : void {
+    this._speed += diff;
+    if(this._speed < 0) {
+      this._speed = 0;
+    }
+    if(this._speed > this._speedMax) {
+      this._speed = this._speedMax;
+    }
   }
 }
 
@@ -158,7 +226,7 @@ class Character {
       );
 
       // Periodic updates.
-      this._scene.registerBeforeRender(function () {
+      this._scene.registerBeforeRender(() => {
         if(! this.position.equals(this._mesh.position)) {
           this._mesh.position.x = this.position.x;
           this._mesh.position.y = this.position.y;
@@ -171,7 +239,7 @@ class Character {
         }
 
         this._playAnimation();
-      }.bind(this));
+      });
 
       if(this._onLoaded) {
         this._onLoaded();
@@ -362,6 +430,7 @@ class SceneryCell {
   coord: Coord;
   recursion: number;
   value: number;
+  maxHeight: number;
   
   constructor(coord: Coord, value: number) {
     this.coord = coord;
@@ -392,6 +461,7 @@ class Scenery {
   private _ground: BABYLON.Mesh;
   private _sideLen: number;
   private _sideMagnitude: number;
+  private _deepestRecursionFound: number;
   private _cells: {[id: string] : SceneryCell};
   private _treeTypes: BABYLON.Mesh[];
   private _shrubTypes: BABYLON.Mesh[];
@@ -409,6 +479,7 @@ class Scenery {
                 "background: orange; color: white");
     this._scene = scene;
     this._shaddows = shaddows;
+    this._deepestRecursionFound = 0;
     this._ground = ground;
     this._groundCover = {};
 
@@ -461,7 +532,10 @@ class Scenery {
     for(let p = this._sideMagnitude; p >= 0; p--) {
       let segmentSize = Math.pow(2, p);
       let recursion = this._sideMagnitude - p;
-      // console.log(p, segmentSize, recursion);
+      if(recursion > this._deepestRecursionFound) {
+        this._deepestRecursionFound = recursion;
+      }
+      console.log(p, segmentSize, recursion);
       for(let x = 0; x < this._sideLen; x += segmentSize) {
         for(let y = 0; y < this._sideLen; y += segmentSize) {
           if(this.getCell({x, y, recursion}) === undefined) {
@@ -502,35 +576,38 @@ class Scenery {
     for(let x = 0; x < this._sideLen; x++) {
       for(let y = 0; y < this._sideLen; y++) {
         let cell = this.getCell({x, y, recursion: this._sideMagnitude});
+        let scale = cell.value / treeScale;
+        let tree: BABYLON.Mesh;
         if(cell.value > 150) {
           let treeTypes = this._treeTypes.length;
-          let tree = this._treeTypes[(x + y) % treeTypes].clone(
+          tree = this._treeTypes[(x + y) % treeTypes].clone(
             this._treeTypes[(x + y) % treeTypes].name + "_" + x + "_" + y);
-          //let tree = this._treeTypes[y % treeTypes].createInstance(
-          //  this._treeTypes[y % treeTypes].name + "_" + x + "_" + y);
+        } else if(cell.value > 80) {
+          let shrubTypes = this._shrubTypes.length;
+          tree = this._shrubTypes[(y + x) % shrubTypes].clone(
+            this._shrubTypes[(y + x) % shrubTypes].name + "_" + x + "_" + y);
+        }
+        if(tree !== undefined){
           tree.position.x = (x - this._sideLen / 2 + Math.random()) * this._mapSpacing;
           tree.position.y = 0;
           tree.position.z = (y - this._sideLen / 2 + Math.random()) * this._mapSpacing;
-          let scale = cell.value / treeScale;
           tree.scaling = new BABYLON.Vector3(scale, scale, scale);
           trees.push(tree);
-          //this._shaddows.getShadowMap().renderList.push(tree);
-        } else if(cell.value > 80) {
-          let shrubTypes = this._shrubTypes.length;
-          let shrub = this._shrubTypes[(y + x) % shrubTypes].clone(
-            this._shrubTypes[(y + x) % shrubTypes].name + "_" + x + "_" + y);
-          shrub.position.x = (x - this._sideLen / 2 + Math.random()) * this._mapSpacing;
-          shrub.position.y = 0;
-          shrub.position.z = (y - this._sideLen / 2 + Math.random()) * this._mapSpacing;
-          let scale = cell.value / treeScale;
-          //shrub.scaling = new BABYLON.Vector3(scale, scale, scale);
-          shrub.scaling.x *= scale;
-          shrub.scaling.y *= scale;
-          shrub.scaling.z *= scale;
-          trees.push(shrub);
+
+          let treeTop = tree.getChildMeshes(true, (mesh) => {
+              return mesh.name.split(".")[1] === "leaves";
+            })[0]
+            .getBoundingInfo().boundingBox.maximumWorld.y;
+          cell.maxHeight = treeTop / this._mapSpacing;
+
+          /*this._applyGroundCover((x - this._sideLen / 2) * this._mapSpacing,
+            (y - this._sideLen / 2) * this._mapSpacing);
+          let testTreetop = BABYLON.MeshBuilder.CreateSphere(
+            "test" + x + "_" + y + " " + this._sideMagnitude, {}, this._scene);
+          testTreetop.position.x = (x - this._sideLen / 2) * this._mapSpacing;
+          testTreetop.position.y = treeTop * scale;
+          testTreetop.position.z = (y - this._sideLen / 2) * this._mapSpacing;*/
         }
-        this._applyGroundCover((x - this._sideLen / 2) * this._mapSpacing,
-                               (y - this._sideLen / 2) * this._mapSpacing);
       }
     }
     // Don't need the prototypes any more so delete them.
@@ -555,6 +632,17 @@ class Scenery {
     }
     return this._cells["" + coord.x + "," + coord.y + "|" + coord.recursion];
   }
+
+  getCellWorld(coord: Coord) : SceneryCell {
+    let x = Math.round(coord.x / this._mapSpacing + this._sideLen / 2);
+    let y = Math.round(coord.y / this._mapSpacing + this._sideLen / 2);
+    let recursion = coord.recursion;
+    if(recursion === undefined) {
+      recursion = this._deepestRecursionFound;
+    }
+    return this.getCell({x, y, recursion});
+  }
+  
 
   getCellParent(coord: Coord) : SceneryCell {
     let cell = this.getCell(coord);
@@ -956,6 +1044,17 @@ class Game {
     // Shadows
     let shadowGenerator = new BABYLON.ShadowGenerator(1024, this._light);
 
+    // Scenery
+    let scenery = new Scenery(this._scene, shadowGenerator, ground, 32);
+    this._scene.onPointerDown = function (evt, pickResult) {
+        // if the click hits the ground object, we change the impact position
+        if (pickResult.hit) {
+            targetHead.position.x = pickResult.pickedPoint.x;
+            targetHead.position.y = pickResult.pickedPoint.y;
+            targetHead.position.z = pickResult.pickedPoint.z;
+        }
+    };
+    
     // Meshes
     // World positions: (l/r, u/d, f/b)
     // let debugBase = BABYLON.MeshBuilder.CreateBox("debugBase", {height: 0.01, width: 0.5, depth: 1}, this._scene);
@@ -975,19 +1074,9 @@ class Game {
     });
     this._actors.push(fox);
     // Star
-    let star = new Star(this._scene);
+    let star = new Star(this._scene, scenery);
     star.mesh.position = new BABYLON.Vector3(0, 5, 0);
 
-    let scenery = new Scenery(this._scene, shadowGenerator, ground, 32);
-    this._scene.onPointerDown = function (evt, pickResult) {
-        // if the click hits the ground object, we change the impact position
-        if (pickResult.hit) {
-            targetHead.position.x = pickResult.pickedPoint.x;
-            targetHead.position.y = pickResult.pickedPoint.y;
-            targetHead.position.z = pickResult.pickedPoint.z;
-        }
-    };
-    
     setTimeout(function() {
       console.log("Add animations.");
       //this._animationQueue.push({name: "stationary", loop: false, reversed: false});
