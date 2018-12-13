@@ -37,7 +37,7 @@ var Star = /** @class */ (function () {
         var cellHeight = this._scenery.getCellWorld({ x: this.mesh.position.x, y: this.mesh.position.z })
             .maxHeight * this._scenery._mapSpacing || 0;
         this._heightDiff = (cellHeight - this.mesh.position.y) / 3 + 5;
-        console.log(this._heightDiff, cellHeight, this.mesh.position.y);
+        //console.log(this._heightDiff, cellHeight, this.mesh.position.y);
         var distanceToMapCenter = Math.abs(this.mesh.position.x) + Math.abs(this.mesh.position.z);
         var angleToMapCenter = Math.atan2(this.mesh.position.x, this.mesh.position.z) + Math.PI;
         if (angleToMapCenter > 2 * Math.PI) {
