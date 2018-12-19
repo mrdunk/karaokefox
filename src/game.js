@@ -5,6 +5,15 @@ var FOX = "fox.babylon";
 var SCALE = 100;
 var ANIM_MERGE_RATE = 0.05;
 var SCENERY_RECURSION = 8;
+var randomNumbers = [];
+function seededRandom(max, min, seed) {
+    max = max || 1;
+    min = min || 0;
+    if (randomNumbers[seed] === undefined) {
+        randomNumbers[seed] = Math.random();
+    }
+    return min + randomNumbers[seed] * (max - min);
+}
 var Star = /** @class */ (function () {
     function Star(scene, scenery) {
         var _this = this;
@@ -34,9 +43,21 @@ var Star = /** @class */ (function () {
         });
     }
     Star.prototype.randomWalk = function () {
+        var time = Math.round(new Date().getTime() / 1000);
         var fps = this._scene.getEngine().getFps();
-        if (fps <= 0) {
+        // Let fps stabilise after missing screen updates due to inactive browser tab.
+        if (time - this._tick > 1) {
+            this._nextUpdate = time + 2;
+        }
+        if (this._tick !== time) {
+            this._tick = time;
+        }
+        if (fps <= 0 || this._nextUpdate > time) {
+            console.log("Limiting star movement.", this._nextUpdate, time);
             fps = 60;
+        }
+        else {
+            this._nextUpdate = time;
         }
         var cellHeight = this._scenery.getHeightWorld({ x: this.mesh.position.x, y: this.mesh.position.z }) || 0;
         this._heightDiff = (cellHeight - this.mesh.position.y) / 3 + 1;
@@ -55,15 +76,13 @@ var Star = /** @class */ (function () {
         this._headingDiff += biasToCenter;
         this._headingDiff += (Math.random() - 0.5) / 10 / fps;
         this.turn(this._headingDiff);
-        this.moveForwards();
-        var time = Math.round(new Date().getTime() / 1000);
+        this.moveForwards(fps);
         if (time % 60 === 0 && time !== this._debugTimer) {
             console.log(this.mesh.position.x, this.mesh.position.y, this.mesh.position.z);
             this._debugTimer = time;
         }
     };
-    Star.prototype.moveForwards = function () {
-        var fps = this._scene.getEngine().getFps();
+    Star.prototype.moveForwards = function (fps) {
         this.mesh.position.x += this._speed * Math.sin(this._heading) / fps;
         this.mesh.position.z += this._speed * Math.cos(this._heading) / fps;
         this.mesh.position.y += this._speed * this._heightDiff / (2 * fps);
@@ -266,7 +285,7 @@ var Character = /** @class */ (function () {
             // this method to continue past this point.
             return;
         }
-        console.log(animateRequest.name, weight, current);
+        // console.log(animateRequest.name, weight, current);
         if (animateRequest.runCount && !animateRequest.loop && animateRequest.reversed) {
             // Freeze frame at first frame in sequence.
             animateRequest.animation.stop();
@@ -322,8 +341,9 @@ var SceneryCell = /** @class */ (function () {
 }());
 var Scenery = /** @class */ (function () {
     function Scenery(scene, shaddows, ground, size) {
-        this._mapSpacing = 5;
-        this._treeScale = 400;
+        this._mapSpacing = 1;
+        this._treeScale = 200;
+        this._treeSeedValue = 75;
         console.log("Mesh count before creating scenery: %c" +
             scene.meshes.length.toString(), "background: orange; color: white");
         this._scene = scene;
@@ -331,38 +351,58 @@ var Scenery = /** @class */ (function () {
         this._ground = ground;
         this._groundCover = {};
         this._mapSize = size;
-        this._maxRecursion = Math.floor(Math.log(size) / Math.log(2));
+        this._maxRecursion = Math.floor(Math.log(this._mapSize) / Math.log(2));
+        this._treeRecursion = this._maxRecursion - 3;
         console.assert(Math.pow(2, this._maxRecursion) === this._mapSize &&
             Boolean("Map size is not a power of 2."));
         this._cells = {};
         for (var recursion = 0; recursion <= this._maxRecursion; recursion++) {
-            var segmentSize = Math.pow(2, this._maxRecursion - recursion);
-            // console.log(segmentSize, recursion);
-            for (var x = 0; x < this._mapSize; x += segmentSize) {
-                for (var y = 0; y < this._mapSize; y += segmentSize) {
-                    if (this.getCell({ x: x, y: y, recursion: recursion }) === undefined) {
-                        var parentCell = this.getCellParent({ x: x, y: y, recursion: recursion });
+            var tileSize = Math.pow(2, this._maxRecursion - recursion);
+            // console.log(tileSize, recursion);
+            for (var x = 0; x < this._mapSize; x += tileSize) {
+                var _loop_1 = function (y) {
+                    if (this_1.getCell({ x: x, y: y, recursion: recursion }) === undefined) {
+                        var parentCell = this_1.getCellParent({ x: x, y: y, recursion: recursion });
                         if (parentCell === undefined) {
-                            this.setCell({ x: x, y: y, recursion: recursion }, 100);
+                            this_1.setCell({ x: x, y: y, recursion: recursion }, this_1._treeSeedValue);
                         }
-                        else if (segmentSize === 1 &&
-                            x <= this._mapSize / 2 && x >= this._mapSize / 2 - segmentSize &&
-                            y <= this._mapSize / 2 && y >= this._mapSize / 2 - segmentSize) {
+                        else if (recursion === this_1._treeRecursion &&
+                            x <= this_1._mapSize / 2 && x >= this_1._mapSize / 2 - tileSize &&
+                            y <= this_1._mapSize / 2 && y >= this_1._mapSize / 2 - tileSize) {
                             // Center of map should always be empty.
-                            this.setCell({ x: x, y: y, recursion: recursion }, 0);
+                            this_1.setCell({ x: x, y: y, recursion: recursion }, 0);
                         }
-                        else if (segmentSize === 1 &&
-                            (x < 4 * segmentSize ||
-                                y < 4 * segmentSize ||
-                                x >= this._mapSize - 4 * segmentSize ||
-                                y >= this._mapSize - 4 * segmentSize)) {
+                        else if (recursion === this_1._treeRecursion &&
+                            (x < 4 * tileSize ||
+                                y < 4 * tileSize ||
+                                x >= this_1._mapSize - 4 * tileSize ||
+                                y >= this_1._mapSize - 4 * tileSize)) {
                             // Dense vegetation round edge.
-                            this.setCell({ x: x, y: y, recursion: recursion }, Math.random() * 200 + 50);
+                            this_1.setCell({ x: x, y: y, recursion: recursion }, Math.random() * this_1._treeSeedValue * 2);
+                        }
+                        else if (recursion > this_1._treeRecursion) {
+                            this_1.setCell({ x: x, y: y, recursion: recursion }, 0);
                         }
                         else {
-                            this.setCell({ x: x, y: y, recursion: recursion }, parentCell.value * (0.5 + Math.random()));
+                            var seed = "" + parentCell.coord.x + "_" + parentCell.coord.y;
+                            var childMod = [
+                                seededRandom(500, 1000, seed),
+                                seededRandom(500, 1000, seed + "_1"),
+                                seededRandom(500, 1000, seed + "_2"),
+                                seededRandom(500, 1000, seed + "_3")
+                            ];
+                            var childModTotal_1 = childMod.reduce(function (total, num) { return total + num; });
+                            childMod.forEach(function (value, index, array) { array[index] /= childModTotal_1; });
+                            var childIndex = ((x - parentCell.coord.x) + 2 * (y - parentCell.coord.y)) / tileSize;
+                            //this.setCell({x, y, recursion},
+                            //parentCell.value * (0.5 + Math.random()));
+                            this_1.setCell({ x: x, y: y, recursion: recursion }, parentCell.value * childMod[childIndex] * 4);
                         }
                     }
+                };
+                var this_1 = this;
+                for (var y = 0; y < this._mapSize; y += tileSize) {
+                    _loop_1(y);
                 }
             }
         }
@@ -377,6 +417,7 @@ var Scenery = /** @class */ (function () {
         //this._shaddows.getShadowMap().renderList.push(this._trees);
     }
     Scenery.prototype._plantTrees = function () {
+        console.log("Planting trees.");
         this._treeTypes = [];
         this._treeSpecies = 0;
         // Ensure there are always /some/ of each type of tree.
@@ -414,78 +455,114 @@ var Scenery = /** @class */ (function () {
         this._groundCoverTypes.push(this._createGroundCover());
         this._groundCoverTypes.push(this._createGroundCover());
         var trees = [];
-        for (var x = 0; x < this._mapSize; x++) {
-            for (var y = 0; y < this._mapSize; y++) {
-                var cell = this.getCell({ x: x, y: y, recursion: this._maxRecursion });
+        var tileSize = Math.pow(2, this._maxRecursion - this._treeRecursion);
+        for (var x = 0; x < this._mapSize; x += tileSize) {
+            for (var y = 0; y < this._mapSize; y += tileSize) {
+                var cell = this.getCell({ x: x, y: y, recursion: this._treeRecursion });
                 var scale = cell.value / this._treeScale;
                 var tree = void 0;
-                if (cell.value > 150) {
+                if (cell.value > 80) {
                     var treeTypeIndex = Math.round(Math.random() * (this._treeTypes.length - 1));
                     //console.log(treeTypeIndex, this._treeTypes.length);
                     tree = this._treeTypes[treeTypeIndex].clone(this._treeTypes[treeTypeIndex].name + "_" + x + "_" + y);
                 }
-                else if (cell.value > 100) {
+                else if (cell.value > 50) {
                     var shrubTypes = this._shrubTypes.length;
                     var shrubTypeIndex = Math.round(Math.random() * (this._shrubTypes.length - 1));
                     tree = this._shrubTypes[shrubTypeIndex].clone(this._shrubTypes[shrubTypeIndex].name + "_" + x + "_" + y);
                 }
                 if (tree !== undefined) {
-                    tree.position.x = (x - this._mapSize / 2 /*+ Math.random() - 0.5*/) * this._mapSpacing;
+                    var jitterX = Math.round(Math.random() * 8 - 4);
+                    var jitterY = Math.round(Math.random() * 8 - 4);
+                    tree.position.x = ((x + jitterX) - this._mapSize / 2) * this._mapSpacing;
                     tree.position.y = 0;
-                    tree.position.z = (y - this._mapSize / 2 /*+ Math.random() - 0.5*/) * this._mapSpacing;
+                    tree.position.z = ((y + jitterY) - this._mapSize / 2) * this._mapSpacing;
                     tree.scaling = new BABYLON.Vector3(scale, scale, scale);
                     trees.push(tree);
                     var leaves = tree.getChildMeshes(true, function (mesh) {
                         return mesh.name.split(".")[1] === "leaves";
                     })[0].getBoundingInfo().boundingBox;
-                    var treeTop = leaves.maximumWorld.y;
-                    var xMin = Math.round(leaves.minimumWorld.x / this._mapSpacing);
-                    var xMax = Math.round(leaves.maximumWorld.x / this._mapSpacing);
-                    var yMin = Math.round(leaves.minimumWorld.z / this._mapSpacing);
-                    var yMax = Math.round(leaves.maximumWorld.z / this._mapSpacing);
-                    for (var xx = xMin + x; xx <= xMax + x; xx++) {
-                        for (var yy = yMin + y; yy <= yMax + y; yy++) {
-                            var c = this.getCell({ x: xx, y: yy, recursion: this._maxRecursion });
-                            if (c && (!c.maxHeight || c.maxHeight < treeTop * scale)) {
-                                c.maxHeight = treeTop * scale;
+                    var leavesTop = leaves.maximumWorld.y * scale;
+                    var leavesBottom = leaves.minimumWorld.y * scale;
+                    var xMin = (leaves.minimumWorld.x / this._mapSpacing) * scale;
+                    var xMax = (leaves.maximumWorld.x / this._mapSpacing) * scale;
+                    var yMin = (leaves.minimumWorld.z / this._mapSpacing) * scale;
+                    var yMax = (leaves.maximumWorld.z / this._mapSpacing) * scale;
+                    for (var xx = Math.ceil(xMin + jitterX); xx <= Math.floor(xMax + jitterX); xx++) {
+                        for (var yy = Math.ceil(yMin + jitterY); yy <= Math.floor(yMax + jitterY); yy++) {
+                            var c_1 = this.getCell({ x: xx + x, y: yy + y, recursion: this._maxRecursion });
+                            if (c_1 && (c_1.maxHeight === undefined || c_1.maxHeight < leavesTop)) {
+                                c_1.maxHeight = leavesTop;
+                            }
+                            if (c_1 && (c_1.minHeight === undefined || c_1.minHeight > leavesBottom) &&
+                                (xx * xx + yy * yy) < (Math.floor(xMax) * Math.floor(xMax))) {
+                                c_1.minHeight = leavesBottom;
                             }
                         }
                     }
-                    /*console.log(xMin, xMax, yMin, yMax);
-                    let testTreetop = BABYLON.MeshBuilder.CreateBox("test",
-                      {"width": (xMax - xMin) * scale * this._mapSpacing,
-                       "height": treeTop * scale,
-                       "depth": (yMax - yMin) * scale * this._mapSpacing},
+                    var c = this.getCell({ x: x, y: y, recursion: this._maxRecursion });
+                    if (c && (c.minHeight === undefined || c.minHeight > leavesBottom)) {
+                        c.minHeight = leavesBottom;
+                    }
+                    var trunk = tree.getChildMeshes(true, function (mesh) {
+                        return mesh.name.split(".")[1] === "trunk";
+                    })[0];
+                    if (trunk) {
+                        var trunkBB = trunk.getBoundingInfo().boundingBox;
+                        var xMinT = Math.round(trunkBB.minimumWorld.x * scale / this._mapSpacing);
+                        var xMaxT = Math.round(trunkBB.maximumWorld.x * scale / this._mapSpacing);
+                        var yMinT = Math.round(trunkBB.minimumWorld.z * scale / this._mapSpacing);
+                        var yMaxT = Math.round(trunkBB.maximumWorld.z * scale / this._mapSpacing);
+                        for (var xx = Math.ceil(xMinT + jitterX); xx <= Math.floor(xMaxT + jitterX); xx++) {
+                            for (var yy = Math.ceil(yMinT + jitterY); yy <= Math.floor(yMaxT + jitterY); yy++) {
+                                var c_2 = this.getCell({ x: xx + x,
+                                    y: yy + y,
+                                    recursion: this._maxRecursion });
+                                if (c_2) {
+                                    c_2.minHeight = 0;
+                                }
+                            }
+                        }
+                    }
+                    // console.log(xMin, xMax, yMin, yMax);
+                    /*let testTreetop = BABYLON.MeshBuilder.CreateBox("test",
+                      {"width": (xMax - xMin) * this._mapSpacing,
+                       "height": leavesTop,
+                       "depth": (yMax - yMin) * this._mapSpacing},
                       this._scene);
-                    var material = new BABYLON.StandardMaterial("myMaterial", scene);
+                    var material = new BABYLON.StandardMaterial("myMaterial", this._scene);
                     material.diffuseColor = new BABYLON.Color3(1, 0, 0);
                     material.wireframe = true;
                     testTreetop.material = material;
                     testTreetop.position.x = (x - this._mapSize / 2) * this._mapSpacing;
-                    testTreetop.position.y = treeTop * scale / 2;
+                    testTreetop.position.y = leavesTop / 2;
                     testTreetop.position.z = (y - this._mapSize / 2) * this._mapSpacing;*/
                     this._applyGroundCover((x - this._mapSize / 2) * this._mapSpacing, (y - this._mapSize / 2) * this._mapSpacing);
                 }
             }
         }
+        console.log("Done planting");
         /*for(let x = 0; x < this._mapSize; x++) {
           for(let y = 0; y < this._mapSize; y++) {
             let cell = this.getCell({x, y, recursion: this._maxRecursion});
-            let scale = cell.value / this._treeScale;
-            let treeTop = cell.maxHeight;
-            let testTreetop = BABYLON.MeshBuilder.CreatePlane(
-              "test" + x + "_" + y + " " + this._maxRecursion,
-              {size: this._maxRecursion, sideOrientation: BABYLON.Mesh.DOUBLESIDE},
-              this._scene);
-            testTreetop.rotation.x = Math.PI / 2;
-            testTreetop.position.x = (x - this._mapSize / 2) * this._mapSpacing;
-            testTreetop.position.y = treeTop;
-            testTreetop.position.z = (y - this._mapSize / 2) * this._mapSpacing;
+            if(cell.minHeight !== undefined) {
+              //let leavesTop = cell.maxHeight;
+              let leavesTop = cell.minHeight;
+              let testTreetop = BABYLON.MeshBuilder.CreatePlane(
+                "test" + x + "_" + y + " " + this._maxRecursion,
+                {size: 1 * this._mapSpacing, sideOrientation: BABYLON.Mesh.DOUBLESIDE},
+                this._scene);
+              testTreetop.rotation.x = Math.PI / 2;
+              testTreetop.position.x = (x - this._mapSize / 2) * this._mapSpacing;
+              testTreetop.position.y = leavesTop;
+              testTreetop.position.z = (y - this._mapSize / 2) * this._mapSpacing;
+            }
           }
         }*/
         // Don't need the prototypes any more so delete them.
         this._treeTypes.forEach(function (node) { node.dispose(); });
         this._shrubTypes.forEach(function (node) { node.dispose(); });
+        console.log("Consolidating trees.");
         this._consolidateTrees(trees);
     };
     Scenery.prototype.setCell = function (coord, value) {
@@ -824,7 +901,7 @@ var Game = /** @class */ (function () {
         // Shadows
         var shadowGenerator = new BABYLON.ShadowGenerator(1024, this._light);
         // Scenery
-        var scenery = new Scenery(this._scene, shadowGenerator, ground, 32);
+        var scenery = new Scenery(this._scene, shadowGenerator, ground, 256);
         this._scene.onPointerDown = function (evt, pickResult) {
             // if the click hits the ground object, we change the impact position
             if (pickResult.hit) {

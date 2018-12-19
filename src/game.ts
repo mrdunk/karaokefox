@@ -7,6 +7,18 @@ let SCALE = 100;
 let ANIM_MERGE_RATE = 0.05;
 let SCENERY_RECURSION = 8;
 
+let randomNumbers: number[] = [];
+function seededRandom(max: number, min: number, seed: any) : number {
+  max = max || 1;
+  min = min || 0;
+
+  if(randomNumbers[seed] === undefined){
+    randomNumbers[seed] = Math.random();
+  }
+
+  return min + randomNumbers[seed] * (max - min);
+}
+
 interface AnimateRequest {
   name: string;
   loop: boolean;
@@ -31,7 +43,9 @@ class Star {
   private _speed: number;
   private _speedMax: number;
   private _heightDiff: number;
-  private _debugTimer; number;
+  private _debugTimer: number;
+  private _nextUpdate: number;
+  private _tick: number;
   
   mesh: BABYLON.Mesh;
 
@@ -71,11 +85,24 @@ class Star {
   }
 
   randomWalk() : void {
+    let time = Math.round(new Date().getTime() / 1000);
     let fps = this._scene.getEngine().getFps();
-    if(fps <= 0) {
-      fps = 60;
-    }
 
+    // Let fps stabilise after missing screen updates due to inactive browser tab.
+    if(time - this._tick > 1) {
+      this._nextUpdate = time + 2;
+    }
+    if(this._tick !== time) {
+      this._tick = time;
+    }
+    
+    if(fps <= 0 || this._nextUpdate > time) {
+      console.log("Limiting star movement.", this._nextUpdate, time);
+      fps = 60;
+    } else {
+      this._nextUpdate = time;
+    }
+    
     let cellHeight = 
       this._scenery.getHeightWorld({x: this.mesh.position.x, y: this.mesh.position.z}) || 0;
     this._heightDiff = (cellHeight - this.mesh.position.y) / 3 + 1;
@@ -97,17 +124,15 @@ class Star {
     this._headingDiff += biasToCenter;
     this._headingDiff += (Math.random() - 0.5) / 10 / fps;
     this.turn(this._headingDiff);
-    this.moveForwards();
+    this.moveForwards(fps);
 
-    let time = Math.round(new Date().getTime() / 1000);
     if(time % 60 === 0 && time !== this._debugTimer) {
       console.log(this.mesh.position.x, this.mesh.position.y, this.mesh.position.z);
       this._debugTimer = time;
     }
   }
 
-  moveForwards() : void {
-    let fps = this._scene.getEngine().getFps();
+  moveForwards(fps: number) : void {
     this.mesh.position.x += this._speed * Math.sin(this._heading) / fps;
     this.mesh.position.z += this._speed * Math.cos(this._heading) / fps;
 
@@ -375,8 +400,7 @@ class Character {
       return;
     }
 
-    console.log(animateRequest.name, weight, current);
-
+    // console.log(animateRequest.name, weight, current);
 
     if(animateRequest.runCount && !animateRequest.loop && animateRequest.reversed) {
       // Freeze frame at first frame in sequence.
@@ -444,6 +468,7 @@ class SceneryCell {
   recursion: number;
   value: number;
   maxHeight: number;
+  minHeight: number;
   
   constructor(coord: Coord, value: number) {
     this.coord = coord;
@@ -474,14 +499,16 @@ class Scenery {
   private _ground: BABYLON.Mesh;
   private _mapSize: number;
   private _maxRecursion: number;
+  private _treeRecursion: number;
   private _cells: {[id: string] : SceneryCell};
   private _treeTypes: BABYLON.Mesh[];
   private _shrubTypes: BABYLON.Mesh[];
   private _groundCoverTypes: BABYLON.StandardMaterial[];
   private _groundCover: {[key: string]: boolean};
   private _treeSpecies: number;
-  private readonly _mapSpacing: number = 5;
-  private readonly _treeScale: number = 400;
+  private readonly _mapSpacing: number = 1;
+  private readonly _treeScale: number = 200;
+  private readonly _treeSeedValue: number = 75;
 
   constructor(scene: BABYLON.Scene,
               shaddows: BABYLON.ShadowGenerator,
@@ -494,38 +521,53 @@ class Scenery {
     this._shaddows = shaddows;
     this._ground = ground;
     this._groundCover = {};
-
     this._mapSize = size;
-    this._maxRecursion = Math.floor(Math.log(size) / Math.log(2));
+    this._maxRecursion = Math.floor(Math.log(this._mapSize) / Math.log(2));
+    this._treeRecursion = this._maxRecursion - 3;
+
     console.assert(Math.pow(2, this._maxRecursion) === this._mapSize &&
                    Boolean("Map size is not a power of 2."));
 
     this._cells = {};
 
     for(let recursion = 0; recursion <= this._maxRecursion; recursion++) {
-      let segmentSize = Math.pow(2, this._maxRecursion - recursion);
-      // console.log(segmentSize, recursion);
-      for(let x = 0; x < this._mapSize; x += segmentSize) {
-        for(let y = 0; y < this._mapSize; y += segmentSize) {
+      let tileSize = Math.pow(2, this._maxRecursion - recursion);
+      // console.log(tileSize, recursion);
+      for(let x = 0; x < this._mapSize; x += tileSize) {
+        for(let y = 0; y < this._mapSize; y += tileSize) {
           if(this.getCell({x, y, recursion}) === undefined) {
             let parentCell = this.getCellParent({x, y, recursion});
             if(parentCell === undefined) {
-              this.setCell({x, y, recursion}, 100);
-            } else if(segmentSize === 1 &&
-                      x <= this._mapSize / 2 && x >= this._mapSize / 2 - segmentSize &&
-                      y <= this._mapSize / 2 && y >= this._mapSize / 2 - segmentSize) {
+              this.setCell({x, y, recursion}, this._treeSeedValue);
+            } else if(recursion === this._treeRecursion &&
+                      x <= this._mapSize / 2 && x >= this._mapSize / 2 - tileSize &&
+                      y <= this._mapSize / 2 && y >= this._mapSize / 2 - tileSize) {
               // Center of map should always be empty.
               this.setCell({x, y, recursion}, 0);
-            } else if(segmentSize === 1 &&
-                      (x < 4 * segmentSize ||
-                       y < 4 * segmentSize ||
-                       x >= this._mapSize - 4 * segmentSize ||
-                       y >= this._mapSize - 4 * segmentSize)) {
+            } else if(recursion === this._treeRecursion &&
+                      (x < 4 * tileSize ||
+                       y < 4 * tileSize ||
+                       x >= this._mapSize - 4 * tileSize ||
+                       y >= this._mapSize - 4 * tileSize)) {
               // Dense vegetation round edge.
-              this.setCell({x, y, recursion}, Math.random() * 200 + 50);
+              this.setCell({x, y, recursion}, Math.random() * this._treeSeedValue * 2);
+            } else if(recursion > this._treeRecursion) {
+              this.setCell({x, y, recursion}, 0);
             } else {
+              let seed = "" + parentCell.coord.x + "_" + parentCell.coord.y;
+              let childMod = [
+                seededRandom(500, 1000, seed),
+                seededRandom(500, 1000, seed + "_1"),
+                seededRandom(500, 1000, seed + "_2"),
+                seededRandom(500, 1000, seed + "_3")];
+              let childModTotal = childMod.reduce((total, num) => { return total + num; });
+              childMod.forEach((value, index, array) => { array[index] /= childModTotal; });
+              let childIndex = ((x - parentCell.coord.x) + 2 * (y - parentCell.coord.y)) / tileSize;
+
+              //this.setCell({x, y, recursion},
+                //parentCell.value * (0.5 + Math.random()));
               this.setCell({x, y, recursion},
-                           parentCell.value * (0.5 + Math.random()));
+                parentCell.value * childMod[childIndex] * 4);
             }
           }
         }
@@ -546,6 +588,7 @@ class Scenery {
   }
 
   private _plantTrees() {
+    console.log("Planting trees.");
     this._treeTypes = [];
     this._treeSpecies = 0;
     // Ensure there are always /some/ of each type of tree.
@@ -586,60 +629,93 @@ class Scenery {
     this._groundCoverTypes.push(this._createGroundCover());
 
     let trees = [];
-    for(let x = 0; x < this._mapSize; x++) {
-      for(let y = 0; y < this._mapSize; y++) {
-        let cell = this.getCell({x, y, recursion: this._maxRecursion});
+    let tileSize = Math.pow(2, this._maxRecursion - this._treeRecursion);
+    for(let x = 0; x < this._mapSize; x += tileSize) {
+      for(let y = 0; y < this._mapSize; y += tileSize) {
+        let cell = this.getCell({x, y, recursion: this._treeRecursion});
         let scale = cell.value / this._treeScale;
         let tree: BABYLON.Mesh;
-        if(cell.value > 150) {
+        if(cell.value > 80) {
           let treeTypeIndex = Math.round(Math.random() * (this._treeTypes.length -1));
           //console.log(treeTypeIndex, this._treeTypes.length);
           tree = this._treeTypes[treeTypeIndex].clone(
             this._treeTypes[treeTypeIndex].name + "_" + x + "_" + y);
-        } else if(cell.value > 100) {
+        } else if(cell.value > 50) {
           let shrubTypes = this._shrubTypes.length;
           let shrubTypeIndex = Math.round(Math.random() * (this._shrubTypes.length -1));
           tree = this._shrubTypes[shrubTypeIndex].clone(
             this._shrubTypes[shrubTypeIndex].name + "_" + x + "_" + y);
         }
         if(tree !== undefined){
+          let jitterX = Math.round(Math.random() * 8 - 4);
+          let jitterY = Math.round(Math.random() * 8 - 4);
           tree.position.x = (
-            x - this._mapSize / 2 /*+ Math.random() - 0.5*/) * this._mapSpacing;
+            (x + jitterX) - this._mapSize / 2) * this._mapSpacing;
           tree.position.y = 0;
           tree.position.z = (
-            y - this._mapSize / 2 /*+ Math.random() - 0.5*/) * this._mapSpacing;
+            (y + jitterY) - this._mapSize / 2) * this._mapSpacing;
           tree.scaling = new BABYLON.Vector3(scale, scale, scale);
           trees.push(tree);
 
           let leaves = tree.getChildMeshes(true, (mesh) => {
             return mesh.name.split(".")[1] === "leaves";
             })[0].getBoundingInfo().boundingBox;
-          let treeTop = leaves.maximumWorld.y;
-          let xMin = Math.round(leaves.minimumWorld.x / this._mapSpacing);
-          let xMax = Math.round(leaves.maximumWorld.x / this._mapSpacing);
-          let yMin = Math.round(leaves.minimumWorld.z / this._mapSpacing);
-          let yMax = Math.round(leaves.maximumWorld.z / this._mapSpacing);
-          for(let xx = xMin + x; xx <= xMax + x; xx++) {
-            for(let yy = yMin + y; yy <= yMax + y; yy++) {
-              let c = this.getCell({x: xx, y: yy, recursion: this._maxRecursion});
-              if(c && (!c.maxHeight || c.maxHeight < treeTop * scale)) {
-                c.maxHeight = treeTop * scale;
+          let leavesTop = leaves.maximumWorld.y * scale;
+          let leavesBottom = leaves.minimumWorld.y * scale;
+          let xMin = (leaves.minimumWorld.x / this._mapSpacing) * scale;
+          let xMax = (leaves.maximumWorld.x / this._mapSpacing) * scale;
+          let yMin = (leaves.minimumWorld.z / this._mapSpacing) * scale;
+          let yMax = (leaves.maximumWorld.z / this._mapSpacing) * scale;
+          for(let xx = Math.ceil(xMin + jitterX); xx <= Math.floor(xMax + jitterX); xx++) {
+            for(let yy = Math.ceil(yMin + jitterY); yy <= Math.floor(yMax + jitterY); yy++) {
+              let c = this.getCell({x: xx + x, y: yy + y, recursion: this._maxRecursion});
+              if(c && (c.maxHeight === undefined || c.maxHeight < leavesTop)) {
+                c.maxHeight = leavesTop;
+              }
+              if(c && (c.minHeight === undefined || c.minHeight > leavesBottom) &&
+                (xx * xx + yy * yy) < (Math.floor(xMax) * Math.floor(xMax))) {
+                c.minHeight = leavesBottom;
+              }
+            }
+          }
+          let c = this.getCell({x, y, recursion: this._maxRecursion});
+          if(c && (c.minHeight === undefined || c.minHeight > leavesBottom)) {
+            c.minHeight = leavesBottom;
+          }
+
+          let trunk = tree.getChildMeshes(true, (mesh) => {
+            return mesh.name.split(".")[1] === "trunk";
+          })[0];
+          if(trunk) {
+            let trunkBB = trunk.getBoundingInfo().boundingBox;
+            let xMinT = Math.round(trunkBB.minimumWorld.x * scale / this._mapSpacing);
+            let xMaxT = Math.round(trunkBB.maximumWorld.x * scale / this._mapSpacing);
+            let yMinT = Math.round(trunkBB.minimumWorld.z * scale / this._mapSpacing);
+            let yMaxT = Math.round(trunkBB.maximumWorld.z * scale / this._mapSpacing);
+            for(let xx = Math.ceil(xMinT + jitterX); xx <= Math.floor(xMaxT + jitterX); xx++) {
+              for(let yy = Math.ceil(yMinT + jitterY); yy <= Math.floor(yMaxT + jitterY); yy++) {
+                let c = this.getCell({x: xx + x,
+                                      y: yy + y,
+                                      recursion: this._maxRecursion});
+                if(c) {
+                  c.minHeight = 0;
+                }
               }
             }
           }
 
-          /*console.log(xMin, xMax, yMin, yMax);
-          let testTreetop = BABYLON.MeshBuilder.CreateBox("test",
-            {"width": (xMax - xMin) * scale * this._mapSpacing,
-             "height": treeTop * scale,
-             "depth": (yMax - yMin) * scale * this._mapSpacing},
+          // console.log(xMin, xMax, yMin, yMax);
+          /*let testTreetop = BABYLON.MeshBuilder.CreateBox("test",
+            {"width": (xMax - xMin) * this._mapSpacing,
+             "height": leavesTop,
+             "depth": (yMax - yMin) * this._mapSpacing},
             this._scene);
-          var material = new BABYLON.StandardMaterial("myMaterial", scene);
+          var material = new BABYLON.StandardMaterial("myMaterial", this._scene);
           material.diffuseColor = new BABYLON.Color3(1, 0, 0);
           material.wireframe = true;
           testTreetop.material = material;
           testTreetop.position.x = (x - this._mapSize / 2) * this._mapSpacing;
-          testTreetop.position.y = treeTop * scale / 2;
+          testTreetop.position.y = leavesTop / 2;
           testTreetop.position.z = (y - this._mapSize / 2) * this._mapSpacing;*/
 
           this._applyGroundCover((x - this._mapSize / 2) * this._mapSpacing,
@@ -648,20 +724,23 @@ class Scenery {
         }
       }
     }
+    console.log("Done planting");
 
     /*for(let x = 0; x < this._mapSize; x++) {
       for(let y = 0; y < this._mapSize; y++) {
         let cell = this.getCell({x, y, recursion: this._maxRecursion});
-        let scale = cell.value / this._treeScale;
-        let treeTop = cell.maxHeight;
-        let testTreetop = BABYLON.MeshBuilder.CreatePlane(
-          "test" + x + "_" + y + " " + this._maxRecursion,
-          {size: this._maxRecursion, sideOrientation: BABYLON.Mesh.DOUBLESIDE},
-          this._scene);
-        testTreetop.rotation.x = Math.PI / 2;
-        testTreetop.position.x = (x - this._mapSize / 2) * this._mapSpacing;
-        testTreetop.position.y = treeTop;
-        testTreetop.position.z = (y - this._mapSize / 2) * this._mapSpacing;
+        if(cell.minHeight !== undefined) {
+          //let leavesTop = cell.maxHeight;
+          let leavesTop = cell.minHeight;
+          let testTreetop = BABYLON.MeshBuilder.CreatePlane(
+            "test" + x + "_" + y + " " + this._maxRecursion,
+            {size: 1 * this._mapSpacing, sideOrientation: BABYLON.Mesh.DOUBLESIDE},
+            this._scene);
+          testTreetop.rotation.x = Math.PI / 2;
+          testTreetop.position.x = (x - this._mapSize / 2) * this._mapSpacing;
+          testTreetop.position.y = leavesTop;
+          testTreetop.position.z = (y - this._mapSize / 2) * this._mapSpacing;
+        }
       }
     }*/
 
@@ -669,6 +748,7 @@ class Scenery {
     this._treeTypes.forEach((node) => { node.dispose(); });
     this._shrubTypes.forEach((node) => { node.dispose(); });
 
+    console.log("Consolidating trees.");
     this._consolidateTrees(trees);
   }
 
@@ -1104,7 +1184,7 @@ class Game {
     let shadowGenerator = new BABYLON.ShadowGenerator(1024, this._light);
 
     // Scenery
-    let scenery = new Scenery(this._scene, shadowGenerator, ground, 32);
+    let scenery = new Scenery(this._scene, shadowGenerator, ground, 256);
     this._scene.onPointerDown = function (evt, pickResult) {
         // if the click hits the ground object, we change the impact position
         if (pickResult.hit) {
