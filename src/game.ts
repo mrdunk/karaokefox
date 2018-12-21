@@ -35,6 +35,25 @@ interface Coord {
   recursion?: number;
 }
 
+function coordToKey(coord: Coord): string {
+  let returnVal = "" + coord.x + "_" + coord.y;
+  if(coord.recursion !== undefined) {
+    returnVal += "_" + coord.recursion;
+  }
+  return returnVal;
+}
+
+function keyToCoord(key: string): Coord {
+  let params = key.split("_");
+  let returnVal: Coord;
+  returnVal.x = Number(params[0]);
+  returnVal.y = Number(params[1]);
+  if(params.length > 2) {
+    returnVal.recursion = Number(params[2]);
+  }
+  return returnVal;
+}
+
 class Star {
   private _scene: BABYLON.Scene;
   private _scenery: Scenery;
@@ -99,6 +118,8 @@ class Star {
     if(fps <= 0 || this._nextUpdate > time) {
       console.log("Limiting star movement.", this._nextUpdate, time);
       fps = 60;
+    } else if(fps > 60) {
+      fps = 60;
     } else {
       this._nextUpdate = time;
     }
@@ -118,11 +139,12 @@ class Star {
     } else {
       biasToCenter = (angleDiff > 0)? -0.0001 : 0.0001;
     }
-    biasToCenter *= distanceToMapCenter / 100;
+    biasToCenter *= (60 / fps);
+    biasToCenter *= distanceToMapCenter / 10;
 
-    this._headingDiff /= 1.01;
+    this._headingDiff /= (1.01 * 60 / fps);
     this._headingDiff += biasToCenter;
-    this._headingDiff += (Math.random() - 0.5) / 10 / fps;
+    this._headingDiff += (Math.random() - 0.5) / fps;
     this.turn(this._headingDiff);
     this.moveForwards(fps);
 
@@ -506,6 +528,7 @@ class Scenery {
   private _groundCoverTypes: BABYLON.StandardMaterial[];
   private _groundCover: {[key: string]: boolean};
   private _treeSpecies: number;
+  private _paths: {[key: string]: {[key: string]: number}};
   private readonly _mapSpacing: number = 1;
   private readonly _treeScale: number = 200;
   private readonly _treeSeedValue: number = 75;
@@ -521,6 +544,7 @@ class Scenery {
     this._shaddows = shaddows;
     this._ground = ground;
     this._groundCover = {};
+    this._paths = {};
     this._mapSize = size;
     this._maxRecursion = Math.floor(Math.log(this._mapSize) / Math.log(2));
     this._treeRecursion = this._maxRecursion - 3;
@@ -587,7 +611,90 @@ class Scenery {
     //this._shaddows.getShadowMap().renderList.push(this._trees);
   }
 
-  private _plantTrees() {
+  calculatePath(destination: Coord) : void {
+    console.time("calculatePath");
+    destination.recursion = this._maxRecursion;
+    if(this._paths[coordToKey(destination)]) {
+      // Already calculated.
+      console.timeEnd("calculatePath");
+      return;
+    }
+
+    let path: {[key: string]: number} = {};
+    path[coordToKey(destination)] = 0;
+    let neighbours: Coord[][] = [];
+
+    function neighboursPop(): Coord {
+      let val: Coord;
+      neighbours.forEach((n, index, array) => {
+        if(val === undefined && array[index].length) {
+          val = array[index].pop();
+        }
+      });
+      return val;
+    }
+
+    function neighboursPush(coord: Coord, val: number): void {
+      while(neighbours.length < val + 1) {
+        neighbours.push([]);
+      }
+      neighbours[val].push(coord);
+    }
+
+    function neighboursLength(): number {
+      let l = 0;
+      neighbours.forEach((n) => {
+        l += n.length;
+      });
+      return l;
+    }
+
+    neighboursPush(destination, 0);
+    while(neighboursLength()) {
+      let working: Coord = neighboursPop();
+      let value: number = path[coordToKey(working)];
+      let adjacent: Coord[] = new Array(4);
+      if(working.x > 0) {
+        adjacent[0] = {"x": working.x -1, "y": working.y, "recursion": this._maxRecursion};
+      }
+      if(working.x < this._mapSize -1) {
+        adjacent[1] = {"x": working.x +1, "y": working.y, "recursion": this._maxRecursion};
+      }
+      if(working.y > 0) {
+        adjacent[2] = {"x": working.x, "y": working.y -1, "recursion": this._maxRecursion};
+      }
+      if(working.y < this._mapSize -1) {
+        adjacent[3] = {"x": working.x, "y": working.y +1, "recursion": this._maxRecursion};
+      }
+      adjacent.forEach((a) => {
+        if(a !== undefined &&
+           (this.getCell(a).minHeight > 1 || this.getCell(a).minHeight === undefined)) {
+          let key = coordToKey(a);
+          if(path[key] === undefined) {
+            path[key] = value + 1;
+
+            neighboursPush(a, value + 1);
+          } else {
+            path[key] = Math.min(value + 1, path[key]);
+          }
+        }
+      });
+    }
+
+    /*for(let y = 0; y < 50; y++) {
+      let line = "";
+      for(let x = 0; x < 30; x++) {
+        let val: string = "" + path["" + x + "_" + y + "_8"];
+        if(val === "undefined") { val = "#"; }
+        line += "\t" + val;
+      }
+      console.log(line);
+    }*/
+    this._paths[coordToKey(destination)] = path;
+    console.timeEnd("calculatePath");
+  }
+
+  private _plantTrees() : void {
     console.log("Planting trees.");
     this._treeTypes = [];
     this._treeSpecies = 0;
@@ -753,16 +860,16 @@ class Scenery {
   }
 
   setCell(coord: Coord, value: number) : void {
-    this._cells["" + coord.x + "," + coord.y + "|" + coord.recursion] =
+    this._cells[coordToKey(coord)] =
       new SceneryCell(coord, value);
   }
 
   getCell(coord: Coord) : SceneryCell {
     //console.log("getCell", coord);
     if(coord.recursion === -1) {
-      return this._cells["0,0|0"];
+      return this._cells["0_0_0"];
     }
-    return this._cells["" + coord.x + "," + coord.y + "|" + coord.recursion];
+    return this._cells[coordToKey(coord)];
   }
 
   getHeightWorld(coord: Coord) : number {
@@ -1185,6 +1292,9 @@ class Game {
 
     // Scenery
     let scenery = new Scenery(this._scene, shadowGenerator, ground, 256);
+    scenery.calculatePath({"x": 0, "y": 0});
+    scenery.calculatePath({"x": 0, "y": 0});
+
     this._scene.onPointerDown = function (evt, pickResult) {
         // if the click hits the ground object, we change the impact position
         if (pickResult.hit) {

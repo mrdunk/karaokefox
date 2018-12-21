@@ -14,6 +14,23 @@ function seededRandom(max, min, seed) {
     }
     return min + randomNumbers[seed] * (max - min);
 }
+function coordToKey(coord) {
+    var returnVal = "" + coord.x + "_" + coord.y;
+    if (coord.recursion !== undefined) {
+        returnVal += "_" + coord.recursion;
+    }
+    return returnVal;
+}
+function keyToCoord(key) {
+    var params = key.split("_");
+    var returnVal;
+    returnVal.x = Number(params[0]);
+    returnVal.y = Number(params[1]);
+    if (params.length > 2) {
+        returnVal.recursion = Number(params[2]);
+    }
+    return returnVal;
+}
 var Star = /** @class */ (function () {
     function Star(scene, scenery) {
         var _this = this;
@@ -56,6 +73,9 @@ var Star = /** @class */ (function () {
             console.log("Limiting star movement.", this._nextUpdate, time);
             fps = 60;
         }
+        else if (fps > 60) {
+            fps = 60;
+        }
         else {
             this._nextUpdate = time;
         }
@@ -71,10 +91,11 @@ var Star = /** @class */ (function () {
         else {
             biasToCenter = (angleDiff > 0) ? -0.0001 : 0.0001;
         }
-        biasToCenter *= distanceToMapCenter / 100;
-        this._headingDiff /= 1.01;
+        biasToCenter *= (60 / fps);
+        biasToCenter *= distanceToMapCenter / 10;
+        this._headingDiff /= (1.01 * 60 / fps);
         this._headingDiff += biasToCenter;
-        this._headingDiff += (Math.random() - 0.5) / 10 / fps;
+        this._headingDiff += (Math.random() - 0.5) / fps;
         this.turn(this._headingDiff);
         this.moveForwards(fps);
         if (time % 60 === 0 && time !== this._debugTimer) {
@@ -350,6 +371,7 @@ var Scenery = /** @class */ (function () {
         this._shaddows = shaddows;
         this._ground = ground;
         this._groundCover = {};
+        this._paths = {};
         this._mapSize = size;
         this._maxRecursion = Math.floor(Math.log(this._mapSize) / Math.log(2));
         this._treeRecursion = this._maxRecursion - 3;
@@ -416,6 +438,87 @@ var Scenery = /** @class */ (function () {
         this._plantTrees();
         //this._shaddows.getShadowMap().renderList.push(this._trees);
     }
+    Scenery.prototype.calculatePath = function (destination) {
+        var _this = this;
+        console.time("calculatePath");
+        destination.recursion = this._maxRecursion;
+        if (this._paths[coordToKey(destination)]) {
+            // Already calculated.
+            console.timeEnd("calculatePath");
+            return;
+        }
+        var path = {};
+        path[coordToKey(destination)] = 0;
+        var neighbours = [];
+        function neighboursPop() {
+            var val;
+            neighbours.forEach(function (n, index, array) {
+                if (val === undefined && array[index].length) {
+                    val = array[index].pop();
+                }
+            });
+            return val;
+        }
+        function neighboursPush(coord, val) {
+            while (neighbours.length < val + 1) {
+                neighbours.push([]);
+            }
+            neighbours[val].push(coord);
+        }
+        function neighboursLength() {
+            var l = 0;
+            neighbours.forEach(function (n) {
+                l += n.length;
+            });
+            return l;
+        }
+        neighboursPush(destination, 0);
+        var _loop_2 = function () {
+            var working = neighboursPop();
+            var value = path[coordToKey(working)];
+            var adjacent = new Array(4);
+            if (working.x > 0) {
+                adjacent[0] = { "x": working.x - 1, "y": working.y, "recursion": this_2._maxRecursion };
+            }
+            if (working.x < this_2._mapSize - 1) {
+                adjacent[1] = { "x": working.x + 1, "y": working.y, "recursion": this_2._maxRecursion };
+            }
+            if (working.y > 0) {
+                adjacent[2] = { "x": working.x, "y": working.y - 1, "recursion": this_2._maxRecursion };
+            }
+            if (working.y < this_2._mapSize - 1) {
+                adjacent[3] = { "x": working.x, "y": working.y + 1, "recursion": this_2._maxRecursion };
+            }
+            adjacent.forEach(function (a) {
+                if (a !== undefined &&
+                    (_this.getCell(a).minHeight > 1 || _this.getCell(a).minHeight === undefined)) {
+                    var key = coordToKey(a);
+                    if (path[key] === undefined) {
+                        path[key] = value + 1;
+                        neighboursPush(a, value + 1);
+                    }
+                    else {
+                        path[key] = Math.min(value + 1, path[key]);
+                    }
+                }
+            });
+        };
+        var this_2 = this;
+        while (neighboursLength()) {
+            _loop_2();
+        }
+        /*for(let y = 0; y < 50; y++) {
+          let line = "";
+          for(let x = 0; x < 30; x++) {
+            let val: string = "" + path["" + x + "_" + y + "_8"];
+            if(val === "undefined") { val = "#"; }
+            line += "\t" + val;
+          }
+          console.log(line);
+        }*/
+        this._paths[coordToKey(destination)] = path;
+        console.timeEnd("calculatePath");
+    };
     Scenery.prototype._plantTrees = function () {
         console.log("Planting trees.");
         this._treeTypes = [];
@@ -566,15 +669,15 @@ var Scenery = /** @class */ (function () {
         this._consolidateTrees(trees);
     };
     Scenery.prototype.setCell = function (coord, value) {
-        this._cells["" + coord.x + "," + coord.y + "|" + coord.recursion] =
+        this._cells[coordToKey(coord)] =
             new SceneryCell(coord, value);
     };
     Scenery.prototype.getCell = function (coord) {
         //console.log("getCell", coord);
         if (coord.recursion === -1) {
-            return this._cells["0,0|0"];
+            return this._cells["0_0_0"];
         }
-        return this._cells["" + coord.x + "," + coord.y + "|" + coord.recursion];
+        return this._cells[coordToKey(coord)];
     };
     Scenery.prototype.getHeightWorld = function (coord) {
         var cell = this.getCellWorld(coord);
@@ -902,6 +1005,8 @@ var Game = /** @class */ (function () {
         var shadowGenerator = new BABYLON.ShadowGenerator(1024, this._light);
         // Scenery
         var scenery = new Scenery(this._scene, shadowGenerator, ground, 256);
+        scenery.calculatePath({ "x": 0, "y": 0 });
+        scenery.calculatePath({ "x": 0, "y": 0 });
         this._scene.onPointerDown = function (evt, pickResult) {
             // if the click hits the ground object, we change the impact position
             if (pickResult.hit) {
