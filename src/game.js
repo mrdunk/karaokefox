@@ -1,5 +1,6 @@
 ///<reference path="3rdParty/babylon.gui.module.d.ts" />
 ///<reference path="plantGenerator.ts" />
+///<reference path="priorityQueue.ts" />
 var SCENEPATH = "scenes/";
 var FOX = "fox.babylon";
 var SCALE = 100;
@@ -30,6 +31,16 @@ function keyToCoord(key) {
         returnVal.recursion = Number(params[2]);
     }
     return returnVal;
+}
+function getX(node) {
+    return node.x;
+}
+function getY(node) {
+    return node.y;
+}
+/* Don't bother doing the square root of Pythagoras. Useful for comparing distances. */
+function cheapDist(a, b) {
+    return Math.abs(a.x - b.x) * Math.abs(a.x - b.x) + Math.abs(a.y - b.y) * Math.abs(a.y - b.y);
 }
 var Star = /** @class */ (function () {
     function Star(scene, scenery) {
@@ -365,13 +376,13 @@ var Scenery = /** @class */ (function () {
         this._mapSpacing = 1;
         this._treeScale = 200;
         this._treeSeedValue = 75;
+        this._headroom = 1;
         console.log("Mesh count before creating scenery: %c" +
             scene.meshes.length.toString(), "background: orange; color: white");
         this._scene = scene;
         this._shaddows = shaddows;
         this._ground = ground;
         this._groundCover = {};
-        this._paths = {};
         this._mapSize = size;
         this._maxRecursion = Math.floor(Math.log(this._mapSize) / Math.log(2));
         this._treeRecursion = this._maxRecursion - 3;
@@ -438,44 +449,66 @@ var Scenery = /** @class */ (function () {
         this._plantTrees();
         //this._shaddows.getShadowMap().renderList.push(this._trees);
     }
-    Scenery.prototype.calculatePath = function (destination) {
+    Scenery.prototype._findClosestSpace = function (coord, height) {
+        var neighbours = new PriorityQueue(getX, getY);
+        var visited = {};
+        neighbours.push(coord, 0);
+        while (neighbours.length()) {
+            var working = neighbours.popLow();
+            visited[coordToKey(working)] = true;
+            if (this.getCell(working).minHeight === undefined ||
+                this.getCell(working).minHeight >= height) {
+                console.log("in: ", coordToKey(coord), "\tout: ", coordToKey(working));
+                return working;
+            }
+            if (working.x > 0) {
+                var node = { "x": working.x - 1, "y": working.y, "recursion": this._maxRecursion };
+                if (!visited[coordToKey(node)]) {
+                    neighbours.push(node, cheapDist(working, coord));
+                }
+            }
+            if (working.x < this._mapSize - 1) {
+                var node = { "x": working.x + 1, "y": working.y, "recursion": this._maxRecursion };
+                if (!visited[coordToKey(node)]) {
+                    neighbours.push(node, cheapDist(working, coord));
+                }
+            }
+            if (working.y > 0) {
+                var node = { "x": working.x, "y": working.y - 1, "recursion": this._maxRecursion };
+                if (!visited[coordToKey(node)]) {
+                    neighbours.push(node, cheapDist(working, coord));
+                }
+            }
+            if (working.y < this._mapSize - 1) {
+                var node = { "x": working.x, "y": working.y + 1, "recursion": this._maxRecursion };
+                if (!visited[coordToKey(node)]) {
+                    neighbours.push(node, cheapDist(working, coord));
+                }
+            }
+        }
+        console.log(visited.length);
+        console.log("in: ", coordToKey(coord), "\tout: ", undefined);
+        return undefined;
+    };
+    Scenery.prototype.calculatePath = function (start, destination) {
         var _this = this;
         console.time("calculatePath");
+        var reachedDestination = false;
+        start.recursion = this._maxRecursion;
         destination.recursion = this._maxRecursion;
-        if (this._paths[coordToKey(destination)]) {
-            // Already calculated.
-            console.timeEnd("calculatePath");
-            return;
-        }
+        var startAdjusted = this._findClosestSpace(start, this._headroom);
+        var destinationAdjusted = this._findClosestSpace(destination, this._headroom);
         var path = {};
-        path[coordToKey(destination)] = 0;
-        var neighbours = [];
-        function neighboursPop() {
-            var val;
-            neighbours.forEach(function (n, index, array) {
-                if (val === undefined && array[index].length) {
-                    val = array[index].pop();
-                }
-            });
-            return val;
-        }
-        function neighboursPush(coord, val) {
-            while (neighbours.length < val + 1) {
-                neighbours.push([]);
-            }
-            neighbours[val].push(coord);
-        }
-        function neighboursLength() {
-            var l = 0;
-            neighbours.forEach(function (n) {
-                l += n.length;
-            });
-            return l;
-        }
-        neighboursPush(destination, 0);
+        path[coordToKey(destinationAdjusted)] = 0;
+        var neighbours = new PriorityQueue(getX, getY);
+        neighbours.push(destinationAdjusted, 0);
         var _loop_2 = function () {
-            var working = neighboursPop();
+            var working = neighbours.popLow();
             var value = path[coordToKey(working)];
+            if (working.x === startAdjusted.x && working.y === startAdjusted.y) {
+                reachedDestination = true;
+                return "break";
+            }
             var adjacent = new Array(4);
             if (working.x > 0) {
                 adjacent[0] = { "x": working.x - 1, "y": working.y, "recursion": this_2._maxRecursion };
@@ -491,33 +524,49 @@ var Scenery = /** @class */ (function () {
             }
             adjacent.forEach(function (a) {
                 if (a !== undefined &&
-                    (_this.getCell(a).minHeight > 1 || _this.getCell(a).minHeight === undefined)) {
+                    (_this.getCell(a).minHeight > _this._headroom ||
+                        _this.getCell(a).minHeight === undefined)) {
                     var key = coordToKey(a);
                     if (path[key] === undefined) {
                         path[key] = value + 1;
-                        neighboursPush(a, value + 1);
+                        neighbours.push(a, value + 1 + cheapDist(a, startAdjusted));
                     }
                     else {
-                        path[key] = Math.min(value + 1, path[key]);
+                        path[key] = Math.min(value + 1 + cheapDist(a, startAdjusted), path[key]);
                     }
                 }
             });
         };
         var this_2 = this;
-        while (neighboursLength()) {
-            _loop_2();
+        while (neighbours.length()) {
+            var state_1 = _loop_2();
+            if (state_1 === "break")
+                break;
         }
-        /*for(let y = 0; y < 50; y++) {
-          let line = "";
-          for(let x = 0; x < 30; x++) {
-            let val: string = "" + path["" + x + "_" + y + "_8"];
-            if(val === "undefined") { val = "#"; }
-            line += "\t" + val;
-          }
-          console.log(line);
-        }*/
-        this._paths[coordToKey(destination)] = path;
+        for (var y = 0; y < 50; y++) {
+            var line = "";
+            for (var x = 0; x < 30; x++) {
+                var node = { x: x, y: y, "recursion": this._maxRecursion };
+                var val = "" + path[coordToKey(node)];
+                if (val === "undefined") {
+                    val = ".";
+                    if (this.getCell(node).minHeight <= 10) {
+                        val = "#";
+                    }
+                }
+                if (x === start.x && y === start.y) {
+                    val = "*";
+                }
+                if (x === startAdjusted.x && y === startAdjusted.y) {
+                    val = "(*)";
+                }
+                line += "\t" + val;
+            }
+            console.log(line);
+        }
         console.timeEnd("calculatePath");
+        console.log("Sucessfull: ", reachedDestination);
+        return reachedDestination;
     };
     Scenery.prototype._plantTrees = function () {
         console.log("Planting trees.");
@@ -1005,8 +1054,7 @@ var Game = /** @class */ (function () {
         var shadowGenerator = new BABYLON.ShadowGenerator(1024, this._light);
         // Scenery
         var scenery = new Scenery(this._scene, shadowGenerator, ground, 256);
-        scenery.calculatePath({ "x": 0, "y": 0 });
-        scenery.calculatePath({ "x": 0, "y": 0 });
+        scenery.calculatePath({ "x": 255, "y": 255 }, { "x": 0, "y": 0 });
         this._scene.onPointerDown = function (evt, pickResult) {
             // if the click hits the ground object, we change the impact position
             if (pickResult.hit) {

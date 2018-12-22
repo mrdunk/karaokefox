@@ -1,5 +1,6 @@
 ///<reference path="3rdParty/babylon.gui.module.d.ts" />
 ///<reference path="plantGenerator.ts" />
+///<reference path="priorityQueue.ts" />
 
 let SCENEPATH = "scenes/";
 let FOX = "fox.babylon";
@@ -52,6 +53,18 @@ function keyToCoord(key: string): Coord {
     returnVal.recursion = Number(params[2]);
   }
   return returnVal;
+}
+
+function getX(node: {"x", "y"}): number {
+  return node.x;
+}
+function getY(node: {"x", "y"}): number {
+  return node.y;
+}
+
+/* Don't bother doing the square root of Pythagoras. Useful for comparing distances. */
+function cheapDist(a: Coord, b: Coord): number {
+  return Math.abs(a.x - b.x) * Math.abs(a.x - b.x) + Math.abs(a.y - b.y) * Math.abs(a.y - b.y);
 }
 
 class Star {
@@ -528,10 +541,10 @@ class Scenery {
   private _groundCoverTypes: BABYLON.StandardMaterial[];
   private _groundCover: {[key: string]: boolean};
   private _treeSpecies: number;
-  private _paths: {[key: string]: {[key: string]: number}};
   private readonly _mapSpacing: number = 1;
   private readonly _treeScale: number = 200;
   private readonly _treeSeedValue: number = 75;
+  private readonly _headroom: number = 1;
 
   constructor(scene: BABYLON.Scene,
               shaddows: BABYLON.ShadowGenerator,
@@ -544,7 +557,6 @@ class Scenery {
     this._shaddows = shaddows;
     this._ground = ground;
     this._groundCover = {};
-    this._paths = {};
     this._mapSize = size;
     this._maxRecursion = Math.floor(Math.log(this._mapSize) / Math.log(2));
     this._treeRecursion = this._maxRecursion - 3;
@@ -611,48 +623,74 @@ class Scenery {
     //this._shaddows.getShadowMap().renderList.push(this._trees);
   }
 
-  calculatePath(destination: Coord) : void {
-    console.time("calculatePath");
-    destination.recursion = this._maxRecursion;
-    if(this._paths[coordToKey(destination)]) {
-      // Already calculated.
-      console.timeEnd("calculatePath");
-      return;
+  private _findClosestSpace(coord: Coord, height: number): Coord {
+    let neighbours: PriorityQueue<Coord> = new PriorityQueue<Coord>(getX, getY);
+    let visited: {[key: string]: boolean} = {};
+    neighbours.push(coord, 0);
+
+    while(neighbours.length()) {
+      let working = neighbours.popLow();
+      visited[coordToKey(working)] = true;
+      if(this.getCell(working).minHeight === undefined ||
+         this.getCell(working).minHeight >= height) {
+        console.log("in: ", coordToKey(coord), "\tout: ", coordToKey(working));
+        return working;
+      }
+
+      if(working.x > 0) {
+        let node = {"x": working.x -1, "y": working.y, "recursion": this._maxRecursion};
+        if(!visited[coordToKey(node)]) {
+          neighbours.push(node, cheapDist(working, coord));
+        }
+      }
+      if(working.x < this._mapSize -1) {
+        let node = {"x": working.x +1, "y": working.y, "recursion": this._maxRecursion};
+        if(!visited[coordToKey(node)]) {
+          neighbours.push(node, cheapDist(working, coord));
+        }
+      }
+      if(working.y > 0) {
+        let node = {"x": working.x, "y": working.y -1, "recursion": this._maxRecursion};
+        if(!visited[coordToKey(node)]) {
+          neighbours.push(node, cheapDist(working, coord));
+        }
+      }
+      if(working.y < this._mapSize -1) {
+        let node = {"x": working.x, "y": working.y +1, "recursion": this._maxRecursion};
+        if(!visited[coordToKey(node)]) {
+          neighbours.push(node, cheapDist(working, coord));
+        }
+      }
     }
+    console.log(visited.length);
+    console.log("in: ", coordToKey(coord), "\tout: ", undefined);
+    return undefined;
+  }
+
+  calculatePath(start: Coord, destination: Coord) : boolean {
+    console.time("calculatePath");
+
+    let reachedDestination = false;
+    start.recursion = this._maxRecursion;
+    destination.recursion = this._maxRecursion;
+
+    let startAdjusted = this._findClosestSpace(start, this._headroom);
+    let destinationAdjusted = this._findClosestSpace(destination, this._headroom);
 
     let path: {[key: string]: number} = {};
-    path[coordToKey(destination)] = 0;
-    let neighbours: Coord[][] = [];
+    path[coordToKey(destinationAdjusted)] = 0;
 
-    function neighboursPop(): Coord {
-      let val: Coord;
-      neighbours.forEach((n, index, array) => {
-        if(val === undefined && array[index].length) {
-          val = array[index].pop();
-        }
-      });
-      return val;
-    }
-
-    function neighboursPush(coord: Coord, val: number): void {
-      while(neighbours.length < val + 1) {
-        neighbours.push([]);
-      }
-      neighbours[val].push(coord);
-    }
-
-    function neighboursLength(): number {
-      let l = 0;
-      neighbours.forEach((n) => {
-        l += n.length;
-      });
-      return l;
-    }
-
-    neighboursPush(destination, 0);
-    while(neighboursLength()) {
-      let working: Coord = neighboursPop();
+    let neighbours: PriorityQueue<Coord> = new PriorityQueue<Coord>(getX, getY);
+    neighbours.push(destinationAdjusted, 0);
+    while(neighbours.length()) {
+      let working: Coord = neighbours.popLow();
       let value: number = path[coordToKey(working)];
+
+      if(working.x === startAdjusted.x && working.y === startAdjusted.y) {
+        reachedDestination = true;
+        break;
+      }
+
       let adjacent: Coord[] = new Array(4);
       if(working.x > 0) {
         adjacent[0] = {"x": working.x -1, "y": working.y, "recursion": this._maxRecursion};
@@ -668,30 +706,39 @@ class Scenery {
       }
       adjacent.forEach((a) => {
         if(a !== undefined &&
-           (this.getCell(a).minHeight > 1 || this.getCell(a).minHeight === undefined)) {
+           (this.getCell(a).minHeight > this._headroom ||
+            this.getCell(a).minHeight === undefined)) {
           let key = coordToKey(a);
           if(path[key] === undefined) {
             path[key] = value + 1;
-
-            neighboursPush(a, value + 1);
+            neighbours.push(a, value + 1 + cheapDist(a, startAdjusted));
           } else {
-            path[key] = Math.min(value + 1, path[key]);
+            path[key] = Math.min(value + 1 + cheapDist(a, startAdjusted), path[key]);
           }
         }
       });
     }
 
-    /*for(let y = 0; y < 50; y++) {
+    for(let y = 0; y < 50; y++) {
       let line = "";
       for(let x = 0; x < 30; x++) {
-        let val: string = "" + path["" + x + "_" + y + "_8"];
-        if(val === "undefined") { val = "#"; }
+        let node = {x, y, "recursion": this._maxRecursion};
+        let val: string = "" + path[coordToKey(node)];
+        if(val === "undefined") {
+          val = ".";
+          if(this.getCell(node).minHeight <= 10) {
+            val = "#";
+          }
+        }
+        if(x === start.x && y === start.y) { val = "*"; }
+        if(x === startAdjusted.x && y === startAdjusted.y) { val = "(*)"; }
         line += "\t" + val;
       }
       console.log(line);
-    }*/
-    this._paths[coordToKey(destination)] = path;
+    }
     console.timeEnd("calculatePath");
+    console.log("Sucessfull: ", reachedDestination);
+    return reachedDestination;
   }
 
   private _plantTrees() : void {
@@ -1292,8 +1339,7 @@ class Game {
 
     // Scenery
     let scenery = new Scenery(this._scene, shadowGenerator, ground, 256);
-    scenery.calculatePath({"x": 0, "y": 0});
-    scenery.calculatePath({"x": 0, "y": 0});
+    scenery.calculatePath({"x": 255, "y": 255}, {"x": 0, "y": 0});
 
     this._scene.onPointerDown = function (evt, pickResult) {
         // if the click hits the ground object, we change the impact position
