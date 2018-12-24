@@ -38,6 +38,9 @@ function getX(node) {
 function getY(node) {
     return node.y;
 }
+function getRecursion(node) {
+    return node.recursion;
+}
 /* Don't bother doing the square root of Pythagoras. Useful for comparing distances. */
 function cheapDist(a, b) {
     return Math.abs(a.x - b.x) * Math.abs(a.x - b.x) + Math.abs(a.y - b.y) * Math.abs(a.y - b.y);
@@ -350,24 +353,26 @@ var Character = /** @class */ (function () {
     return Character;
 }());
 var SceneryCell = /** @class */ (function () {
-    function SceneryCell(coord, value) {
-        this.coord = coord;
-        this.value = value;
+    function SceneryCell(coord, vegitation) {
+        this.x = coord.x;
+        this.y = coord.y;
+        this.recursion = coord.recursion;
+        this.vegitation = vegitation;
     }
     SceneryCell.prototype.parentCoordinates = function (depth) {
         var pX = 0;
         var pY = 0;
-        for (var bit = depth - 1; bit >= depth - this.coord.recursion + 1; bit--) {
+        for (var bit = depth - 1; bit >= depth - this.recursion + 1; bit--) {
             var mask = 1 << bit;
-            if (mask & this.coord.x) {
+            if (mask & this.x) {
                 pX |= mask;
             }
-            if (mask & this.coord.y) {
+            if (mask & this.y) {
                 pY |= mask;
             }
             //console.log(bit, mask, pX, pY);
         }
-        return { x: pX, y: pY, recursion: this.coord.recursion - 1 };
+        return { x: pX, y: pY, recursion: this.recursion - 1 };
     };
     return SceneryCell;
 }());
@@ -388,7 +393,7 @@ var Scenery = /** @class */ (function () {
         this._treeRecursion = this._maxRecursion - 3;
         console.assert(Math.pow(2, this._maxRecursion) === this._mapSize &&
             Boolean("Map size is not a power of 2."));
-        this._cells = {};
+        this._cells = new MyMap(getX, getY, getRecursion);
         for (var recursion = 0; recursion <= this._maxRecursion; recursion++) {
             var tileSize = Math.pow(2, this._maxRecursion - recursion);
             // console.log(tileSize, recursion);
@@ -417,7 +422,7 @@ var Scenery = /** @class */ (function () {
                             this_1.setCell({ x: x, y: y, recursion: recursion }, 0);
                         }
                         else {
-                            var seed = "" + parentCell.coord.x + "_" + parentCell.coord.y;
+                            var seed = "" + parentCell.x + "_" + parentCell.y;
                             var childMod = [
                                 seededRandom(500, 1000, seed),
                                 seededRandom(500, 1000, seed + "_1"),
@@ -425,11 +430,11 @@ var Scenery = /** @class */ (function () {
                                 seededRandom(500, 1000, seed + "_3")
                             ];
                             var childModTotal_1 = childMod.reduce(function (total, num) { return total + num; });
-                            childMod.forEach(function (value, index, array) { array[index] /= childModTotal_1; });
-                            var childIndex = ((x - parentCell.coord.x) + 2 * (y - parentCell.coord.y)) / tileSize;
+                            childMod.forEach(function (vegitation, index, array) { array[index] /= childModTotal_1; });
+                            var childIndex = ((x - parentCell.x) + 2 * (y - parentCell.y)) / tileSize;
                             //this.setCell({x, y, recursion},
-                            //parentCell.value * (0.5 + Math.random()));
-                            this_1.setCell({ x: x, y: y, recursion: recursion }, parentCell.value * childMod[childIndex] * 4);
+                            //parentCell.vegitation * (0.5 + Math.random()));
+                            this_1.setCell({ x: x, y: y, recursion: recursion }, parentCell.vegitation * childMod[childIndex] * 4);
                         }
                     }
                 };
@@ -439,10 +444,11 @@ var Scenery = /** @class */ (function () {
                 }
             }
         }
+        console.log("Cell count: ", this._cells.length);
         /*for(let x = 0; x < this._mapSize; x++) {
           let line = "";
           for(let y = 0; y < this._mapSize; y++) {
-            line += " " + Math.round(this.getCell({x, y, recursion: this._maxRecursion}).value);
+            line += " " + Math.round(this.getCell({x, y, recursion: this._maxRecursion}).vegitation);
           }
           console.log(line);
         }*/
@@ -453,7 +459,7 @@ var Scenery = /** @class */ (function () {
         var neighbours = new PriorityQueue(getX, getY);
         var visited = {};
         neighbours.push(coord, 0);
-        while (neighbours.length()) {
+        while (neighbours.length) {
             var working = neighbours.popLow();
             visited[coordToKey(working)] = true;
             if (this.getCell(working).minHeight === undefined ||
@@ -496,49 +502,45 @@ var Scenery = /** @class */ (function () {
         var reachedDestination = false;
         start.recursion = this._maxRecursion;
         destination.recursion = this._maxRecursion;
-        var startAdjusted = this._findClosestSpace(start, this._headroom);
-        var destinationAdjusted = this._findClosestSpace(destination, this._headroom);
-        var path = {};
-        path[coordToKey(destinationAdjusted)] = 0;
+        var startAdjusted = this.getCell(this._findClosestSpace(start, this._headroom));
+        var destinationAdjusted = this.getCell(this._findClosestSpace(destination, this._headroom));
+        destinationAdjusted.pathScore = 0;
         var neighbours = new PriorityQueue(getX, getY);
         neighbours.push(destinationAdjusted, 0);
         var _loop_2 = function () {
             var working = neighbours.popLow();
-            var value = path[coordToKey(working)];
             if (working.x === startAdjusted.x && working.y === startAdjusted.y) {
                 reachedDestination = true;
                 return "break";
             }
             var adjacent = new Array(4);
             if (working.x > 0) {
-                adjacent[0] = { "x": working.x - 1, "y": working.y, "recursion": this_2._maxRecursion };
+                adjacent[0] = this_2.getCell({ "x": working.x - 1, "y": working.y, "recursion": this_2._maxRecursion });
             }
             if (working.x < this_2._mapSize - 1) {
-                adjacent[1] = { "x": working.x + 1, "y": working.y, "recursion": this_2._maxRecursion };
+                adjacent[1] = this_2.getCell({ "x": working.x + 1, "y": working.y, "recursion": this_2._maxRecursion });
             }
             if (working.y > 0) {
-                adjacent[2] = { "x": working.x, "y": working.y - 1, "recursion": this_2._maxRecursion };
+                adjacent[2] = this_2.getCell({ "x": working.x, "y": working.y - 1, "recursion": this_2._maxRecursion });
             }
             if (working.y < this_2._mapSize - 1) {
-                adjacent[3] = { "x": working.x, "y": working.y + 1, "recursion": this_2._maxRecursion };
+                adjacent[3] = this_2.getCell({ "x": working.x, "y": working.y + 1, "recursion": this_2._maxRecursion });
             }
             adjacent.forEach(function (a) {
                 if (a !== undefined &&
-                    (_this.getCell(a).minHeight > _this._headroom ||
-                        _this.getCell(a).minHeight === undefined)) {
-                    var key = coordToKey(a);
-                    if (path[key] === undefined) {
-                        path[key] = value + 1;
-                        neighbours.push(a, value + 1 + cheapDist(a, startAdjusted));
+                    (a.minHeight > _this._headroom || a.minHeight === undefined)) {
+                    if (a.pathScore === undefined) {
+                        a.pathScore = working.pathScore + 1;
+                        neighbours.push(a, working.pathScore + 1 + cheapDist(a, startAdjusted));
                     }
                     else {
-                        path[key] = Math.min(value + 1 + cheapDist(a, startAdjusted), path[key]);
+                        a.pathScore = Math.min(a.pathScore, working.pathScore + 1);
                     }
                 }
             });
         };
         var this_2 = this;
-        while (neighbours.length()) {
+        while (neighbours.length) {
             var state_1 = _loop_2();
             if (state_1 === "break")
                 break;
@@ -546,8 +548,8 @@ var Scenery = /** @class */ (function () {
         for (var y = 0; y < 50; y++) {
             var line = "";
             for (var x = 0; x < 30; x++) {
-                var node = { x: x, y: y, "recursion": this._maxRecursion };
-                var val = "" + path[coordToKey(node)];
+                var node = this.getCell({ x: x, y: y, "recursion": this._maxRecursion });
+                var val = "" + node.pathScore;
                 if (val === "undefined") {
                     val = ".";
                     if (this.getCell(node).minHeight <= 10) {
@@ -611,14 +613,14 @@ var Scenery = /** @class */ (function () {
         for (var x = 0; x < this._mapSize; x += tileSize) {
             for (var y = 0; y < this._mapSize; y += tileSize) {
                 var cell = this.getCell({ x: x, y: y, recursion: this._treeRecursion });
-                var scale = cell.value / this._treeScale;
+                var scale = cell.vegitation / this._treeScale;
                 var tree = void 0;
-                if (cell.value > 80) {
+                if (cell.vegitation > 80) {
                     var treeTypeIndex = Math.round(Math.random() * (this._treeTypes.length - 1));
                     //console.log(treeTypeIndex, this._treeTypes.length);
                     tree = this._treeTypes[treeTypeIndex].clone(this._treeTypes[treeTypeIndex].name + "_" + x + "_" + y);
                 }
-                else if (cell.value > 50) {
+                else if (cell.vegitation > 50) {
                     var shrubTypes = this._shrubTypes.length;
                     var shrubTypeIndex = Math.round(Math.random() * (this._shrubTypes.length - 1));
                     tree = this._shrubTypes[shrubTypeIndex].clone(this._shrubTypes[shrubTypeIndex].name + "_" + x + "_" + y);
@@ -717,16 +719,15 @@ var Scenery = /** @class */ (function () {
         console.log("Consolidating trees.");
         this._consolidateTrees(trees);
     };
-    Scenery.prototype.setCell = function (coord, value) {
-        this._cells[coordToKey(coord)] =
-            new SceneryCell(coord, value);
+    Scenery.prototype.setCell = function (coord, vegitation) {
+        var cell = new SceneryCell(coord, vegitation);
+        this._cells.put(cell, cell);
     };
     Scenery.prototype.getCell = function (coord) {
-        //console.log("getCell", coord);
         if (coord.recursion === -1) {
-            return this._cells["0_0_0"];
+            return this._cells.get({ "x": 0, "y": 0, "recursion": 0 });
         }
-        return this._cells[coordToKey(coord)];
+        return this._cells.get(coord);
     };
     Scenery.prototype.getHeightWorld = function (coord) {
         var cell = this.getCellWorld(coord);

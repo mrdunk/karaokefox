@@ -61,6 +61,9 @@ function getX(node: {"x", "y"}): number {
 function getY(node: {"x", "y"}): number {
   return node.y;
 }
+function getRecursion(node: {"x", "y", "recursion"}): number {
+  return node.recursion;
+}
 
 /* Don't bother doing the square root of Pythagoras. Useful for comparing distances. */
 function cheapDist(a: Coord, b: Coord): number {
@@ -498,33 +501,37 @@ class Character {
   }
 }
 
-class SceneryCell {
-  coord: Coord;
+class SceneryCell implements Coord {
+  x: number;
+  y: number;
   recursion: number;
-  value: number;
+  vegitation: number;
   maxHeight: number;
   minHeight: number;
+  pathScore: number;
   
-  constructor(coord: Coord, value: number) {
-    this.coord = coord;
-    this.value = value;
+  constructor(coord: Coord, vegitation: number) {
+    this.x = coord.x;
+    this.y = coord.y;
+    this.recursion = coord.recursion;
+    this.vegitation = vegitation;
   }
 
   parentCoordinates(depth: number) : Coord {
     let pX = 0;
     let pY = 0;
-    for(let bit = depth -1; bit >= depth - this.coord.recursion +1; bit--) {
+    for(let bit = depth -1; bit >= depth - this.recursion +1; bit--) {
       let mask = 1 << bit;
-      if(mask & this.coord.x) {
+      if(mask & this.x) {
         pX |= mask;
       }
-      if(mask & this.coord.y) {
+      if(mask & this.y) {
         pY |= mask;
       }
       //console.log(bit, mask, pX, pY);
     }
 
-    return {x: pX, y: pY, recursion: this.coord.recursion -1};
+    return {x: pX, y: pY, recursion: this.recursion -1};
   }
 }
 
@@ -535,7 +542,7 @@ class Scenery {
   private _mapSize: number;
   private _maxRecursion: number;
   private _treeRecursion: number;
-  private _cells: {[id: string] : SceneryCell};
+  private _cells: MyMap<Coord, SceneryCell>;
   private _treeTypes: BABYLON.Mesh[];
   private _shrubTypes: BABYLON.Mesh[];
   private _groundCoverTypes: BABYLON.StandardMaterial[];
@@ -564,7 +571,7 @@ class Scenery {
     console.assert(Math.pow(2, this._maxRecursion) === this._mapSize &&
                    Boolean("Map size is not a power of 2."));
 
-    this._cells = {};
+    this._cells = new MyMap<Coord, SceneryCell>(getX, getY, getRecursion);
 
     for(let recursion = 0; recursion <= this._maxRecursion; recursion++) {
       let tileSize = Math.pow(2, this._maxRecursion - recursion);
@@ -590,30 +597,31 @@ class Scenery {
             } else if(recursion > this._treeRecursion) {
               this.setCell({x, y, recursion}, 0);
             } else {
-              let seed = "" + parentCell.coord.x + "_" + parentCell.coord.y;
+              let seed = "" + parentCell.x + "_" + parentCell.y;
               let childMod = [
                 seededRandom(500, 1000, seed),
                 seededRandom(500, 1000, seed + "_1"),
                 seededRandom(500, 1000, seed + "_2"),
                 seededRandom(500, 1000, seed + "_3")];
               let childModTotal = childMod.reduce((total, num) => { return total + num; });
-              childMod.forEach((value, index, array) => { array[index] /= childModTotal; });
-              let childIndex = ((x - parentCell.coord.x) + 2 * (y - parentCell.coord.y)) / tileSize;
+              childMod.forEach((vegitation, index, array) => { array[index] /= childModTotal; });
+              let childIndex = ((x - parentCell.x) + 2 * (y - parentCell.y)) / tileSize;
 
               //this.setCell({x, y, recursion},
-                //parentCell.value * (0.5 + Math.random()));
+                //parentCell.vegitation * (0.5 + Math.random()));
               this.setCell({x, y, recursion},
-                parentCell.value * childMod[childIndex] * 4);
+                parentCell.vegitation * childMod[childIndex] * 4);
             }
           }
         }
       }
     }
+    console.log("Cell count: ", this._cells.length);
     
     /*for(let x = 0; x < this._mapSize; x++) {
       let line = "";
       for(let y = 0; y < this._mapSize; y++) {
-        line += " " + Math.round(this.getCell({x, y, recursion: this._maxRecursion}).value);
+        line += " " + Math.round(this.getCell({x, y, recursion: this._maxRecursion}).vegitation);
       }
       console.log(line);
     }*/
@@ -628,7 +636,7 @@ class Scenery {
     let visited: {[key: string]: boolean} = {};
     neighbours.push(coord, 0);
 
-    while(neighbours.length()) {
+    while(neighbours.length) {
       let working = neighbours.popLow();
       visited[coordToKey(working)] = true;
       if(this.getCell(working).minHeight === undefined ||
@@ -674,46 +682,50 @@ class Scenery {
     start.recursion = this._maxRecursion;
     destination.recursion = this._maxRecursion;
 
-    let startAdjusted = this._findClosestSpace(start, this._headroom);
-    let destinationAdjusted = this._findClosestSpace(destination, this._headroom);
+    let startAdjusted = this.getCell(
+      this._findClosestSpace(start, this._headroom));
+    let destinationAdjusted = this.getCell(
+      this._findClosestSpace(destination, this._headroom));
 
-    let path: {[key: string]: number} = {};
-    path[coordToKey(destinationAdjusted)] = 0;
+    destinationAdjusted.pathScore = 0;
 
-    let neighbours: PriorityQueue<Coord> = new PriorityQueue<Coord>(getX, getY);
+    let neighbours: PriorityQueue<SceneryCell> =
+      new PriorityQueue<SceneryCell>(getX, getY);
     neighbours.push(destinationAdjusted, 0);
-    while(neighbours.length()) {
-      let working: Coord = neighbours.popLow();
-      let value: number = path[coordToKey(working)];
+
+    while(neighbours.length) {
+      let working: SceneryCell = neighbours.popLow();
 
       if(working.x === startAdjusted.x && working.y === startAdjusted.y) {
         reachedDestination = true;
         break;
       }
 
-      let adjacent: Coord[] = new Array(4);
+      let adjacent: SceneryCell[] = new Array(4);
       if(working.x > 0) {
-        adjacent[0] = {"x": working.x -1, "y": working.y, "recursion": this._maxRecursion};
+        adjacent[0] = this.getCell(
+          {"x": working.x -1, "y": working.y, "recursion": this._maxRecursion});
       }
       if(working.x < this._mapSize -1) {
-        adjacent[1] = {"x": working.x +1, "y": working.y, "recursion": this._maxRecursion};
+        adjacent[1] = this.getCell(
+          {"x": working.x +1, "y": working.y, "recursion": this._maxRecursion});
       }
       if(working.y > 0) {
-        adjacent[2] = {"x": working.x, "y": working.y -1, "recursion": this._maxRecursion};
+        adjacent[2] = this.getCell(
+          {"x": working.x, "y": working.y -1, "recursion": this._maxRecursion});
       }
       if(working.y < this._mapSize -1) {
-        adjacent[3] = {"x": working.x, "y": working.y +1, "recursion": this._maxRecursion};
+        adjacent[3] = this.getCell(
+          {"x": working.x, "y": working.y +1, "recursion": this._maxRecursion});
       }
       adjacent.forEach((a) => {
         if(a !== undefined &&
-           (this.getCell(a).minHeight > this._headroom ||
-            this.getCell(a).minHeight === undefined)) {
-          let key = coordToKey(a);
-          if(path[key] === undefined) {
-            path[key] = value + 1;
-            neighbours.push(a, value + 1 + cheapDist(a, startAdjusted));
+           (a.minHeight > this._headroom || a.minHeight === undefined)) {
+          if(a.pathScore === undefined) {
+            a.pathScore = working.pathScore + 1;
+            neighbours.push(a, working.pathScore + 1 + cheapDist(a, startAdjusted));
           } else {
-            path[key] = Math.min(value + 1 + cheapDist(a, startAdjusted), path[key]);
+            a.pathScore = Math.min(a.pathScore, working.pathScore + 1);
           }
         }
       });
@@ -722,8 +734,8 @@ class Scenery {
     for(let y = 0; y < 50; y++) {
       let line = "";
       for(let x = 0; x < 30; x++) {
-        let node = {x, y, "recursion": this._maxRecursion};
-        let val: string = "" + path[coordToKey(node)];
+        let node = this.getCell({x, y, "recursion": this._maxRecursion});
+        let val = "" + node.pathScore;
         if(val === "undefined") {
           val = ".";
           if(this.getCell(node).minHeight <= 10) {
@@ -787,14 +799,14 @@ class Scenery {
     for(let x = 0; x < this._mapSize; x += tileSize) {
       for(let y = 0; y < this._mapSize; y += tileSize) {
         let cell = this.getCell({x, y, recursion: this._treeRecursion});
-        let scale = cell.value / this._treeScale;
+        let scale = cell.vegitation / this._treeScale;
         let tree: BABYLON.Mesh;
-        if(cell.value > 80) {
+        if(cell.vegitation > 80) {
           let treeTypeIndex = Math.round(Math.random() * (this._treeTypes.length -1));
           //console.log(treeTypeIndex, this._treeTypes.length);
           tree = this._treeTypes[treeTypeIndex].clone(
             this._treeTypes[treeTypeIndex].name + "_" + x + "_" + y);
-        } else if(cell.value > 50) {
+        } else if(cell.vegitation > 50) {
           let shrubTypes = this._shrubTypes.length;
           let shrubTypeIndex = Math.round(Math.random() * (this._shrubTypes.length -1));
           tree = this._shrubTypes[shrubTypeIndex].clone(
@@ -906,17 +918,16 @@ class Scenery {
     this._consolidateTrees(trees);
   }
 
-  setCell(coord: Coord, value: number) : void {
-    this._cells[coordToKey(coord)] =
-      new SceneryCell(coord, value);
+  setCell(coord: Coord, vegitation: number) : void {
+    let cell = new SceneryCell(coord, vegitation);
+    this._cells.put(cell, cell);
   }
 
   getCell(coord: Coord) : SceneryCell {
-    //console.log("getCell", coord);
     if(coord.recursion === -1) {
-      return this._cells["0_0_0"];
+      return this._cells.get({"x": 0, "y": 0, "recursion": 0});
     }
-    return this._cells[coordToKey(coord)];
+    return this._cells.get(coord);
   }
 
   getHeightWorld(coord: Coord) : number {
