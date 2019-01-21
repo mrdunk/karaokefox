@@ -13,7 +13,7 @@ function seededRandom(max: number, min: number, seed: any) : number {
   max = max || 1;
   min = min || 0;
 
-  if(randomNumbers[seed] === undefined){
+  if (randomNumbers[seed] === undefined) {
     randomNumbers[seed] = Math.random();
   }
 
@@ -38,7 +38,7 @@ interface Coord {
 
 function coordToKey(coord: Coord): string {
   let returnVal = "" + coord.x + "_" + coord.y;
-  if(coord.recursion !== undefined) {
+  if (coord.recursion !== undefined) {
     returnVal += "_" + coord.recursion;
   }
   return returnVal;
@@ -49,7 +49,7 @@ function keyToCoord(key: string): Coord {
   let returnVal: Coord;
   returnVal.x = Number(params[0]);
   returnVal.y = Number(params[1]);
-  if(params.length > 2) {
+  if (params.length > 2) {
     returnVal.recursion = Number(params[2]);
   }
   return returnVal;
@@ -83,7 +83,7 @@ class Star {
   private _debugTimer: number;
   private _nextUpdate: number;
   private _tick: number;
-  
+
   mesh: BABYLON.Mesh;
 
   constructor(scene: BABYLON.Scene, scenery: Scenery) {
@@ -102,7 +102,7 @@ class Star {
     let pyramidB =
       BABYLON.MeshBuilder.CreatePolyhedron("pyramidB", {type: 0, size: 1}, this._scene);
     pyramidB.rotate(BABYLON.Axis.Y, Math.PI);
-    
+
     let starMaterialW = new BABYLON.StandardMaterial("starMaterialW", this._scene);
     starMaterialW.emissiveColor = new BABYLON.Color3(1, 1, 1);
     let starMaterialY = new BABYLON.StandardMaterial("starMaterialY", this._scene);
@@ -126,36 +126,36 @@ class Star {
     let fps = this._scene.getEngine().getFps();
 
     // Let fps stabilise after missing screen updates due to inactive browser tab.
-    if(time - this._tick > 1) {
+    if (time - this._tick > 1) {
       this._nextUpdate = time + 2;
     }
-    if(this._tick !== time) {
+    if (this._tick !== time) {
       this._tick = time;
     }
-    
-    if(fps <= 0 || this._nextUpdate > time) {
+
+    if (fps <= 0 || this._nextUpdate > time) {
       console.log("Limiting star movement.", this._nextUpdate, time);
       fps = 60;
-    } else if(fps > 60) {
+    } else if (fps > 60) {
       fps = 60;
     } else {
       this._nextUpdate = time;
     }
-    
-    let cellHeight = 
+
+    let cellHeight =
       this._scenery.getHeightWorld({x: this.mesh.position.x, y: this.mesh.position.z}) || 0;
     this._heightDiff = (cellHeight - this.mesh.position.y) / 3 + 1;
 
     let distanceToMapCenter = Math.abs(this.mesh.position.x) + Math.abs(this.mesh.position.z);
     let angleToMapCenter = (
       Math.atan2(this.mesh.position.x, this.mesh.position.z) + Math.PI) % (2 * Math.PI);
-    
+
     let angleDiff = angleToMapCenter - this._heading;
     let biasToCenter = 0;
-    if(angleDiff <= Math.PI) {
-      biasToCenter = (angleDiff < 0)? -0.0001 : 0.0001;
+    if (angleDiff <= Math.PI) {
+      biasToCenter = (angleDiff < 0) ? -0.0001 : 0.0001;
     } else {
-      biasToCenter = (angleDiff > 0)? -0.0001 : 0.0001;
+      biasToCenter = (angleDiff > 0) ? -0.0001 : 0.0001;
     }
     biasToCenter *= (60 / fps);
     biasToCenter *= distanceToMapCenter / 10;
@@ -166,7 +166,7 @@ class Star {
     this.turn(this._headingDiff);
     this.moveForwards(fps);
 
-    if(time % 60 === 0 && time !== this._debugTimer) {
+    if (time % 60 === 0 && time !== this._debugTimer) {
       console.log(this.mesh.position.x, this.mesh.position.y, this.mesh.position.z);
       this._debugTimer = time;
     }
@@ -181,20 +181,20 @@ class Star {
 
   turn(angle: number) : void {
     this._heading += angle;
-    if(this._heading < 0) {
+    if (this._heading < 0) {
       this._heading += 2 * Math.PI;
     }
-    if(this._heading > 2 * Math.PI) {
+    if (this._heading > 2 * Math.PI) {
       this._heading -= 2 * Math.PI;
     }
   }
 
   modifySpeed(diff: number) : void {
     this._speed += diff;
-    if(this._speed < 0) {
+    if (this._speed < 0) {
       this._speed = 0;
     }
-    if(this._speed > this._speedMax) {
+    if (this._speed > this._speedMax) {
       this._speed = this._speedMax;
     }
   }
@@ -236,7 +236,7 @@ class Character {
   }
 
   onSceneLoad(meshes: BABYLON.Mesh[], particleSystems: [], skeletons: BABYLON.Skeleton[]) : void {
-    try{
+    try {
       console.assert(meshes.length === 1);
       console.assert(particleSystems.length === 0);
       console.assert(skeletons.length === 1);
@@ -251,10 +251,10 @@ class Character {
       //this._mesh.scaling = new BABYLON.Vector3(SCALE, SCALE, SCALE);
       //this._mesh.receiveShadows = true;
       //this._mesh.convertToFlatShadedMesh();
-      
-      this._mesh.material.zOffset = -100;
 
-      if(this._shaddows) {
+      this._mesh.material.zOffset = - 100;
+
+      if (this._shaddows) {
         this._shaddows.getShadowMap().renderList.push(this._mesh);
       }
 
@@ -263,10 +263,10 @@ class Character {
       skeletonViewer.color = BABYLON.Color3.Red(); // Change default color from white to red*/
 
       // Parse all bones and store any we need later for future access.
-      for(let index = 0; index < this._skeleton.bones.length; index++) {
+      for (let index = 0; index < this._skeleton.bones.length; index++) {
         let bone = skeletons[0].bones[index];
         // console.log(bone.uniqueId, bone.id);
-        switch(bone.id) {
+        switch (bone.id) {
           case "spine.head":
             this._bones.head = bone;
             break;
@@ -283,7 +283,7 @@ class Character {
       }
 
       // Animations
-      for(let a = 0; a < this._skeleton.getAnimationRanges().length; a++) {
+      for (let a = 0; a < this._skeleton.getAnimationRanges().length; a++) {
         let animation = this._skeleton.getAnimationRanges()[a];
         //console.log(a, animation.name);
         this._animations[animation.name] = this._skeleton.getAnimationRanges()[a];
@@ -305,12 +305,12 @@ class Character {
 
       // Periodic updates.
       this._scene.registerBeforeRender(() => {
-        if(! this.position.equals(this._mesh.position)) {
+        if (! this.position.equals(this._mesh.position)) {
           this._mesh.position.x = this.position.x;
           this._mesh.position.y = this.position.y;
           this._mesh.position.z = this.position.z;
         }
-        if(! this.rotation.equals(this._mesh.rotation)) {
+        if (! this.rotation.equals(this._mesh.rotation)) {
           this._mesh.rotation.x = this.rotation.x;
           this._mesh.rotation.y = this.rotation.y;
           this._mesh.rotation.z = this.rotation.z;
@@ -319,11 +319,11 @@ class Character {
         this._playAnimation();
       });
 
-      if(this._onLoaded) {
+      if (this._onLoaded) {
         this._onLoaded();
       }
 
-    } catch(error) {
+    } catch (error) {
       // Prevent error messages in this section getting swallowed by Babylon.
       console.error(error);
     }
@@ -331,8 +331,8 @@ class Character {
 
   lookAt(target: BABYLON.Vector3) : void {
     this._lookAt = target;
-    
-    this._scene.registerBeforeRender(function () {
+
+    this._scene.registerBeforeRender(function() {
       // The neck should pint half way between straight forward and the
       // direction the head is pointing.
       let spineUpper = this._bones.spineupper;
@@ -342,17 +342,19 @@ class Character {
       let targetLocalYZ = new BABYLON.Vector3(0, targetLocal.y, targetLocal.z);
       let aheadLocal = new BABYLON.Vector3(0, targetLocal.length(), 0);  // (l/r, f/b, u/d)
 
-      let angleXY = BABYLON.Vector3.GetAngleBetweenVectors(targetLocalXY, aheadLocal, new BABYLON.Vector3(0, 0, 1));
-      let angleYZ = BABYLON.Vector3.GetAngleBetweenVectors(targetLocalYZ, aheadLocal, new BABYLON.Vector3(-1, 0, 0));
-      
+      let angleXY = BABYLON.Vector3.GetAngleBetweenVectors(
+        targetLocalXY, aheadLocal, new BABYLON.Vector3(0, 0, 1));
+      let angleYZ = BABYLON.Vector3.GetAngleBetweenVectors(
+        targetLocalYZ, aheadLocal, new BABYLON.Vector3(- 1, 0, 0));
+
       let lookAtNeckLocal =
-        new BABYLON.Vector3(Math.sin(angleXY /2) * targetLocalXY.length(),
-                            (Math.cos(angleXY /2) * targetLocalXY.length() +
-                             Math.cos(angleYZ /2) * targetLocalYZ.length()) / 2,
-                            Math.sin(angleYZ /2) * targetLocalYZ.length());
+        new BABYLON.Vector3(Math.sin(angleXY / 2) * targetLocalXY.length(),
+                            (Math.cos(angleXY / 2) * targetLocalXY.length() +
+                             Math.cos(angleYZ / 2) * targetLocalYZ.length()) / 2,
+                            Math.sin(angleYZ / 2) * targetLocalYZ.length());
       spineUpper.getAbsolutePositionFromLocalToRef(lookAtNeckLocal, this._mesh, this._lookAtNeck);
 
-      if(angleXY > -Math.PI / 2 && angleXY < Math.PI / 2 &&
+      if (angleXY > -Math.PI / 2 && angleXY < Math.PI / 2 &&
          angleYZ > -Math.PI / 2 && angleYZ < Math.PI / 2) {
         // Only look at thing if it's not behind us.
         //this._lookCtrlNeck.update();
@@ -379,7 +381,7 @@ class Character {
    * If _animationLast.cleanup is set, stop the animation and delete.
    */
   private _playAnimation() : void {
-    if(this._animationLast === undefined && this._animationQueue.length > 0) {
+    if (this._animationLast === undefined && this._animationQueue.length > 0) {
       this._animationLast = this._animationCurrent;
       this._animationCurrent = this._animationQueue.shift();
       console.log("New: " + this._animationCurrent.name);
@@ -388,7 +390,7 @@ class Character {
     this._serviceAnimation(this._animationCurrent, true);
     this._serviceAnimation(this._animationLast, false);
 
-    if(this._animationLast && this._animationLast.cleanup) {
+    if (this._animationLast && this._animationLast.cleanup) {
       this._animationLast.animation.stop();
       this._animationLast.animation = undefined;
       this._animationLast = undefined;
@@ -406,34 +408,34 @@ class Character {
    *   current: If true, the animation weight will be increased with each call
    *     (to a mavimum value of 1).
    *     If false, the animation weight will be decreased with each call until
-   *     it reaches 0 at which time the animation will be stopped and 
+   *     it reaches 0 at which time the animation will be stopped and
    *     AnimateRequest.cleanup will be set.
    */
   private _serviceAnimation(animateRequest: AnimateRequest, current: boolean) : void {
-    if(animateRequest === undefined) {
+    if (animateRequest === undefined) {
       return;
     }
 
     let weight = animateRequest.runCount ? animateRequest.animation.weight : 0;
-    if(current && weight < 1) {
+    if (current && weight < 1) {
       weight += ANIM_MERGE_RATE;
       weight = Math.min(1, weight);
-    } else if(!current && weight > 0) {
+    } else if (!current && weight > 0) {
       weight -= ANIM_MERGE_RATE;
       weight = Math.max(0, weight);
     }
 
-    if(animateRequest.animation) {
+    if (animateRequest.animation) {
       animateRequest.animation.weight = weight;
     }
 
-    if(weight <= 0) {
+    if (weight <= 0) {
       // This old AnimateRequest has been faded out and needs stopped and removed.
       animateRequest.cleanup = true;
       return;
     }
 
-    if(animateRequest.dirty === false) {
+    if (animateRequest.dirty === false) {
       // Nothing more to do.
       // Animations which end set animateRequest.dirty to true when they need
       // this method to continue past this point.
@@ -442,13 +444,13 @@ class Character {
 
     // console.log(animateRequest.name, weight, current);
 
-    if(animateRequest.runCount && !animateRequest.loop && animateRequest.reversed) {
+    if (animateRequest.runCount && !animateRequest.loop && animateRequest.reversed) {
       // Freeze frame at first frame in sequence.
       animateRequest.animation.stop();
       animateRequest.animation = this._scene.beginWeightedAnimation(
         this._skeleton,
-        this._animations[animateRequest.name].from +2,
-        this._animations[animateRequest.name].from +2,
+        this._animations[animateRequest.name].from + 2,
+        this._animations[animateRequest.name].from + 2,
         weight,
         false,
         0.01,
@@ -456,7 +458,7 @@ class Character {
           animateRequest.dirty = true;
         }.bind(this)
       );
-    } else if(animateRequest.runCount && !animateRequest.loop) {
+    } else if (animateRequest.runCount && !animateRequest.loop) {
       // Freeze frame at last frame in sequence.
       animateRequest.animation.stop();
       animateRequest.animation = this._scene.beginWeightedAnimation(
@@ -470,12 +472,12 @@ class Character {
           animateRequest.dirty = true;
         }.bind(this)
       );
-    } else if(animateRequest.reversed) {
+    } else if (animateRequest.reversed) {
       // Play an animation in reverse.
       animateRequest.animation = this._scene.beginWeightedAnimation(
         this._skeleton,
         this._animations[animateRequest.name].to,
-        this._animations[animateRequest.name].from +2,
+        this._animations[animateRequest.name].from + 2,
         weight,
         false,
         1,
@@ -487,7 +489,7 @@ class Character {
       // Play an animation.
       animateRequest.animation = this._scene.beginWeightedAnimation(
         this._skeleton,
-        this._animations[animateRequest.name].from +2,
+        this._animations[animateRequest.name].from + 2,
         this._animations[animateRequest.name].to,
         weight,
         false,
@@ -511,7 +513,7 @@ class SceneryCell implements Coord {
   maxHeight: number;
   minHeight: number;
   pathScore: number;
-  
+
   constructor(coord: Coord, vegitation: number) {
     this.x = coord.x;
     this.y = coord.y;
@@ -522,18 +524,18 @@ class SceneryCell implements Coord {
   parentCoordinates(depth: number) : Coord {
     let pX = 0;
     let pY = 0;
-    for(let bit = depth -1; bit >= depth - this.recursion +1; bit--) {
+    for (let bit = depth - 1; bit >= depth - this.recursion + 1; bit--) {
       let mask = 1 << bit;
-      if(mask & this.x) {
+      if (mask & this.x) {
         pX |= mask;
       }
-      if(mask & this.y) {
+      if (mask & this.y) {
         pY |= mask;
       }
       //console.log(bit, mask, pX, pY);
     }
 
-    return {x: pX, y: pY, recursion: this.recursion -1};
+    return {x: pX, y: pY, recursion: this.recursion - 1};
   }
 }
 
@@ -575,28 +577,28 @@ class Scenery {
 
     this._cells = new MyMap<Coord, SceneryCell>(getX, getY, getRecursion);
 
-    for(let recursion = 0; recursion <= this._maxRecursion; recursion++) {
+    for (let recursion = 0; recursion <= this._maxRecursion; recursion++) {
       let tileSize = Math.pow(2, this._maxRecursion - recursion);
       // console.log(tileSize, recursion);
-      for(let x = 0; x < this._mapSize; x += tileSize) {
-        for(let y = 0; y < this._mapSize; y += tileSize) {
-          if(this.getCell({x, y, recursion}) === undefined) {
+      for (let x = 0; x < this._mapSize; x += tileSize) {
+        for (let y = 0; y < this._mapSize; y += tileSize) {
+          if (this.getCell({x, y, recursion}) === undefined) {
             let parentCell = this.getCellParent({x, y, recursion});
-            if(parentCell === undefined) {
+            if (parentCell === undefined) {
               this.setCell({x, y, recursion}, this._treeSeedValue);
-            } else if(recursion === this._treeRecursion &&
+            } else if (recursion === this._treeRecursion &&
                       x <= this._mapSize / 2 && x >= this._mapSize / 2 - tileSize &&
                       y <= this._mapSize / 2 && y >= this._mapSize / 2 - tileSize) {
               // Center of map should always be empty.
               this.setCell({x, y, recursion}, 0);
-            } else if(recursion === this._treeRecursion &&
+            } else if (recursion === this._treeRecursion &&
                       (x < 4 * tileSize ||
                        y < 4 * tileSize ||
                        x >= this._mapSize - 4 * tileSize ||
                        y >= this._mapSize - 4 * tileSize)) {
               // Dense vegetation round edge.
               this.setCell({x, y, recursion}, Math.random() * this._treeSeedValue * 2);
-            } else if(recursion > this._treeRecursion) {
+            } else if (recursion > this._treeRecursion) {
               this.setCell({x, y, recursion}, 0);
             } else {
               let seed = "" + parentCell.x + "_" + parentCell.y;
@@ -619,15 +621,15 @@ class Scenery {
       }
     }
     console.log("Cell count: ", this._cells.length);
-    
-    /*for(let x = 0; x < this._mapSize; x++) {
+
+    /*for (let x = 0; x < this._mapSize; x++) {
       let line = "";
-      for(let y = 0; y < this._mapSize; y++) {
+      for (let y = 0; y < this._mapSize; y++) {
         line += " " + Math.round(this.getCell({x, y, recursion: this._maxRecursion}).vegitation);
       }
       console.log(line);
     }*/
-    
+
     this._plantTrees();
 
     //this._shaddows.getShadowMap().renderList.push(this._trees);
@@ -638,36 +640,36 @@ class Scenery {
     let visited: {[key: string]: boolean} = {};
     neighbours.push(coord, 0);
 
-    while(neighbours.length) {
+    while (neighbours.length) {
       let working = neighbours.popLow();
       visited[coordToKey(working)] = true;
-      if(this.getCell(working).minHeight === undefined ||
+      if (this.getCell(working).minHeight === undefined ||
          this.getCell(working).minHeight >= height) {
         console.log("in: ", coordToKey(coord), "\tout: ", coordToKey(working));
         return working;
       }
 
-      if(working.x > 0) {
-        let node = {"x": working.x -1, "y": working.y, "recursion": this._maxRecursion};
-        if(!visited[coordToKey(node)]) {
+      if (working.x > 0) {
+        let node = {"x": working.x - 1, "y": working.y, "recursion": this._maxRecursion};
+        if (!visited[coordToKey(node)]) {
           neighbours.push(node, distBetween(working, coord));
         }
       }
-      if(working.x < this._mapSize -1) {
-        let node = {"x": working.x +1, "y": working.y, "recursion": this._maxRecursion};
-        if(!visited[coordToKey(node)]) {
+      if (working.x < this._mapSize - 1) {
+        let node = {"x": working.x + 1, "y": working.y, "recursion": this._maxRecursion};
+        if (!visited[coordToKey(node)]) {
           neighbours.push(node, distBetween(working, coord));
         }
       }
-      if(working.y > 0) {
-        let node = {"x": working.x, "y": working.y -1, "recursion": this._maxRecursion};
-        if(!visited[coordToKey(node)]) {
+      if (working.y > 0) {
+        let node = {"x": working.x, "y": working.y - 1, "recursion": this._maxRecursion};
+        if (!visited[coordToKey(node)]) {
           neighbours.push(node, distBetween(working, coord));
         }
       }
-      if(working.y < this._mapSize -1) {
-        let node = {"x": working.x, "y": working.y +1, "recursion": this._maxRecursion};
-        if(!visited[coordToKey(node)]) {
+      if (working.y < this._mapSize - 1) {
+        let node = {"x": working.x, "y": working.y + 1, "recursion": this._maxRecursion};
+        if (!visited[coordToKey(node)]) {
           neighbours.push(node, distBetween(working, coord));
         }
       }
@@ -695,35 +697,35 @@ class Scenery {
       new PriorityQueue<SceneryCell>(getX, getY);
     neighbours.push(destinationAdjusted, 0);
 
-    while(neighbours.length) {
+    while (neighbours.length) {
       let working: SceneryCell = neighbours.popLow();
 
-      if(working.x === startAdjusted.x && working.y === startAdjusted.y) {
+      if (working.x === startAdjusted.x && working.y === startAdjusted.y) {
         reachedDestination = true;
         break;
       }
 
       let adjacent: SceneryCell[] = new Array(4);
-      if(working.x > 0) {
+      if (working.x > 0) {
         adjacent[0] = this.getCell(
-          {"x": working.x -1, "y": working.y, "recursion": this._maxRecursion});
+          {"x": working.x - 1, "y": working.y, "recursion": this._maxRecursion});
       }
-      if(working.x < this._mapSize -1) {
+      if (working.x < this._mapSize - 1) {
         adjacent[1] = this.getCell(
-          {"x": working.x +1, "y": working.y, "recursion": this._maxRecursion});
+          {"x": working.x + 1, "y": working.y, "recursion": this._maxRecursion});
       }
-      if(working.y > 0) {
+      if (working.y > 0) {
         adjacent[2] = this.getCell(
-          {"x": working.x, "y": working.y -1, "recursion": this._maxRecursion});
+          {"x": working.x, "y": working.y - 1, "recursion": this._maxRecursion});
       }
-      if(working.y < this._mapSize -1) {
+      if (working.y < this._mapSize - 1) {
         adjacent[3] = this.getCell(
-          {"x": working.x, "y": working.y +1, "recursion": this._maxRecursion});
+          {"x": working.x, "y": working.y + 1, "recursion": this._maxRecursion});
       }
       adjacent.forEach((a) => {
-        if(a !== undefined &&
+        if (a !== undefined &&
            (a.minHeight > this._headroom || a.minHeight === undefined)) {
-          if(a.pathScore === undefined) {
+          if (a.pathScore === undefined) {
             a.pathScore = working.pathScore + 1;
             neighbours.push(a, a.pathScore + distBetween(a, startAdjusted));
           } else {
@@ -733,14 +735,14 @@ class Scenery {
       });
     }
 
-    /*for(let y = 0; y < this._mapSize; y++) {
+    /*for (let y = 0; y < this._mapSize; y++) {
       let line = "";
-      for(let x = 0; x < this._mapSize; x++) {
+      for (let x = 0; x < this._mapSize; x++) {
         let node = this.getCell({x, y, "recursion": this._maxRecursion});
         let val = "" + node.pathScore;
-        if(val === "undefined") {
+        if (val === "undefined") {
           val = " ";
-          if(this.getCell(node).minHeight <= this._headroom) {
+          if (this.getCell(node).minHeight <= this._headroom) {
             val = "#";
           }
         } else {
@@ -750,13 +752,13 @@ class Scenery {
           pathNode.position.y = 0;
           pathNode.position.z = this.mapToWorld(node).y;
         }
-        if(x === start.x && y === start.y) { val = "*"; }
-        if(x === startAdjusted.x && y === startAdjusted.y) { val = "(*)"; }
-        if(y < 50 && x < 150) {
+        if (x === start.x && y === start.y) { val = "*"; }
+        if (x === startAdjusted.x && y === startAdjusted.y) { val = "(*)"; }
+        if (y < 50 && x < 150) {
           line += val;
         }
       }
-      if(y < 50) {
+      if (y < 50) {
         console.log(line);
       }
     }*/
@@ -808,23 +810,23 @@ class Scenery {
 
     let trees = [];
     let tileSize = Math.pow(2, this._maxRecursion - this._treeRecursion);
-    for(let x = 0; x < this._mapSize; x += tileSize) {
-      for(let y = 0; y < this._mapSize; y += tileSize) {
+    for (let x = 0; x < this._mapSize; x += tileSize) {
+      for (let y = 0; y < this._mapSize; y += tileSize) {
         let cell = this.getCell({x, y, recursion: this._treeRecursion});
         let scale = cell.vegitation / this._treeScale;
         let tree: BABYLON.Mesh;
-        if(cell.vegitation > 80) {
-          let treeTypeIndex = Math.round(Math.random() * (this._treeTypes.length -1));
+        if (cell.vegitation > 80) {
+          let treeTypeIndex = Math.round(Math.random() * (this._treeTypes.length - 1));
           //console.log(treeTypeIndex, this._treeTypes.length);
           tree = this._treeTypes[treeTypeIndex].clone(
             this._treeTypes[treeTypeIndex].name + "_" + x + "_" + y);
-        } else if(cell.vegitation > 50) {
+        } else if (cell.vegitation > 50) {
           let shrubTypes = this._shrubTypes.length;
-          let shrubTypeIndex = Math.round(Math.random() * (this._shrubTypes.length -1));
+          let shrubTypeIndex = Math.round(Math.random() * (this._shrubTypes.length - 1));
           tree = this._shrubTypes[shrubTypeIndex].clone(
             this._shrubTypes[shrubTypeIndex].name + "_" + x + "_" + y);
         }
-        if(tree !== undefined){
+        if (tree !== undefined) {
           let jitterX = Math.round(Math.random() * 8 - 4);
           let jitterY = Math.round(Math.random() * 8 - 4);
           tree.position.x = (
@@ -844,39 +846,39 @@ class Scenery {
           let xMax = (leaves.maximumWorld.x / this._mapSpacing) * scale;
           let yMin = (leaves.minimumWorld.z / this._mapSpacing) * scale;
           let yMax = (leaves.maximumWorld.z / this._mapSpacing) * scale;
-          //for(let xx = Math.ceil(xMin + jitterX); xx <= Math.floor(xMax + jitterX); xx++) {
-          for(let xx = Math.floor(xMin + jitterX); xx <= Math.ceil(xMax + jitterX); xx++) {
-            //for(let yy = Math.ceil(yMin + jitterY); yy <= Math.floor(yMax + jitterY); yy++) {
-            for(let yy = Math.floor(yMin + jitterY); yy <= Math.ceil(yMax + jitterY); yy++) {
+          //for (let xx = Math.ceil(xMin + jitterX); xx <= Math.floor(xMax + jitterX); xx++) {
+          for (let xx = Math.floor(xMin + jitterX); xx <= Math.ceil(xMax + jitterX); xx++) {
+            //for (let yy = Math.ceil(yMin + jitterY); yy <= Math.floor(yMax + jitterY); yy++) {
+            for (let yy = Math.floor(yMin + jitterY); yy <= Math.ceil(yMax + jitterY); yy++) {
               let c = this.getCell({x: xx + x, y: yy + y, recursion: this._maxRecursion});
-              if(c && (c.maxHeight === undefined || c.maxHeight < leavesTop)) {
+              if (c && (c.maxHeight === undefined || c.maxHeight < leavesTop)) {
                 c.maxHeight = leavesTop;
               }
-              if(c && (c.minHeight > leavesBottom || c.minHeight === undefined)) {
+              if (c && (c.minHeight > leavesBottom || c.minHeight === undefined)) {
                 c.minHeight = leavesBottom;
               }
             }
           }
           let c = this.getCell({x, y, recursion: this._maxRecursion});
-          if(c && (c.minHeight === undefined || c.minHeight > leavesBottom)) {
+          if (c && (c.minHeight === undefined || c.minHeight > leavesBottom)) {
             c.minHeight = leavesBottom;
           }
 
           let trunk = tree.getChildMeshes(true, (mesh) => {
             return mesh.name.split(".")[1] === "trunk";
           })[0];
-          if(trunk) {
+          if (trunk) {
             let trunkBB = trunk.getBoundingInfo().boundingBox;
             let xMinT = Math.round(trunkBB.minimumWorld.x * scale / this._mapSpacing);
             let xMaxT = Math.round(trunkBB.maximumWorld.x * scale / this._mapSpacing);
             let yMinT = Math.round(trunkBB.minimumWorld.z * scale / this._mapSpacing);
             let yMaxT = Math.round(trunkBB.maximumWorld.z * scale / this._mapSpacing);
-            for(let xx = Math.ceil(xMinT + jitterX); xx <= Math.floor(xMaxT + jitterX); xx++) {
-              for(let yy = Math.ceil(yMinT + jitterY); yy <= Math.floor(yMaxT + jitterY); yy++) {
+            for (let xx = Math.ceil(xMinT + jitterX); xx <= Math.floor(xMaxT + jitterX); xx++) {
+              for (let yy = Math.ceil(yMinT + jitterY); yy <= Math.floor(yMaxT + jitterY); yy++) {
                 let c = this.getCell({x: xx + x,
                                       y: yy + y,
                                       recursion: this._maxRecursion});
-                if(c) {
+                if (c) {
                   c.minHeight = 0;
                 }
               }
@@ -906,10 +908,10 @@ class Scenery {
     }
     console.log("Done planting");
 
-    /*for(let x = 0; x < this._mapSize; x++) {
-      for(let y = 0; y < this._mapSize; y++) {
+    /*for (let x = 0; x < this._mapSize; x++) {
+      for (let y = 0; y < this._mapSize; y++) {
         let cell = this.getCell({x, y, recursion: this._maxRecursion});
-        if(cell.minHeight !== undefined) {
+        if (cell.minHeight !== undefined) {
           //let leavesTop = cell.maxHeight;
           let leavesTop = cell.minHeight;
           let testTreetop = BABYLON.MeshBuilder.CreatePlane(
@@ -936,7 +938,7 @@ class Scenery {
     let x = Math.round(coord.x / this._mapSpacing + this._mapSize / 2);
     let y = Math.round(coord.y / this._mapSpacing + this._mapSize / 2);
     let recursion = coord.recursion;
-    if(recursion === undefined) {
+    if (recursion === undefined) {
       recursion = this._maxRecursion;
     }
     return {x, y, recursion};
@@ -946,7 +948,7 @@ class Scenery {
     let x = Math.round(coord.x * this._mapSpacing - this._mapSize / 2);
     let y = Math.round(coord.y * this._mapSpacing - this._mapSize / 2);
     let recursion = coord.recursion;
-    if(recursion === undefined) {
+    if (recursion === undefined) {
       recursion = this._maxRecursion;
     }
     return {x, y, recursion};
@@ -958,7 +960,7 @@ class Scenery {
   }
 
   getCell(coord: Coord) : SceneryCell {
-    if(coord.recursion === -1) {
+    if (coord.recursion === - 1) {
       return this._cells.get({"x": 0, "y": 0, "recursion": 0});
     }
     return this._cells.get(coord);
@@ -966,7 +968,7 @@ class Scenery {
 
   getHeightWorld(coord: Coord) : number {
     let cell = this.getCellWorld(coord);
-    if(!cell) {
+    if (!cell) {
       return 0;
     }
     return cell.maxHeight;
@@ -978,8 +980,8 @@ class Scenery {
 
   getCellParent(coord: Coord) : SceneryCell {
     let cell = this.getCell(coord);
-    if(cell === undefined) {
-      return this.getCell(new SceneryCell(coord, -1).parentCoordinates(this._maxRecursion));
+    if (cell === undefined) {
+      return this.getCell(new SceneryCell(coord, - 1).parentCoordinates(this._maxRecursion));
     }
     return this.getCell(cell.parentCoordinates(this._maxRecursion));
   }
@@ -998,18 +1000,18 @@ class Scenery {
       // Collect the different tree species together in 2 collections:
       // trunks and leaves.
       let treeIndex = parseInt(tree.name.split("_")[1], 10);
-      if(treeFoliageBucket[treeIndex] === undefined || treeTrunkBucket == undefined) {
+      if (treeFoliageBucket[treeIndex] === undefined || treeTrunkBucket == undefined) {
         treeFoliageBucket[treeIndex] = [];
         treeTrunkBucket[treeIndex] = [];
       }
       tree.getChildMeshes(true).forEach((node) => {
         let nodeName = node.name.split(".")[1];
-        if(nodeName === "leaves") {
+        if (nodeName === "leaves") {
           let pos = node.getAbsolutePosition();
           node.setParent(null);
           node.setAbsolutePosition(pos);
           treeFoliageBucket[treeIndex].push(node);
-        } else if(nodeName === "trunk") {
+        } else if (nodeName === "trunk") {
           let pos = node.getAbsolutePosition();
           node.setParent(null);
           node.setAbsolutePosition(pos);
@@ -1025,7 +1027,7 @@ class Scenery {
 
     // Combine all trunks of the same species together.
     treeTrunkBucket.forEach((bucket) => {
-      if(bucket && bucket.length) {
+      if (bucket && bucket.length) {
         countStart += bucket.length;
         countFinal++;
         let t = BABYLON.Mesh.MergeMeshes(bucket, true, true, null, true);
@@ -1034,14 +1036,13 @@ class Scenery {
     }, this);
     // Combine all leaves of the same species together.
     treeFoliageBucket.forEach((bucket) => {
-      if(bucket && bucket.length) {
+      if (bucket && bucket.length) {
         countStart += bucket.length;
         countFinal++;
         let t = BABYLON.Mesh.MergeMeshes(bucket, true, true, null, true);
         // this._shaddows.getShadowMap().renderList.push(t);
       }
     }, this);
-
 
     console.log("Tree component count before _consolidateTrees: %c" +
                 countStart.toString(),
@@ -1055,7 +1056,7 @@ class Scenery {
   }
 
   _createTree() : BABYLON.Mesh {
-    if(Math.random() > 0.2) {
+    if (Math.random() > 0.2) {
       return this._createTreeDeciduous();
     }
     return this._createTreePine();
@@ -1099,7 +1100,7 @@ class Scenery {
                                                    0.2 + Math.random() * 0.2);
     leafMaterial.specularColor = BABYLON.Color3.Red();
     let tree = QuickTreeGenerator(
-      sizeBranch, sizeTrunk, radius, trunkMaterial, leafMaterial, this._scene)
+      sizeBranch, sizeTrunk, radius, trunkMaterial, leafMaterial, this._scene);
     tree.setEnabled(false);
     tree.name += "_" + this._treeSpecies;
     this._treeSpecies++;
@@ -1107,7 +1108,7 @@ class Scenery {
   }
 
   _createShrub(forceSapling?: boolean) : BABYLON.Mesh {
-    if(Math.random() < 0.1 || forceSapling) {
+    if (Math.random() < 0.1 || forceSapling) {
       let sapling = this._createTree();
       sapling.scaling.x *= 0.2;
       sapling.scaling.y *= 0.2;
@@ -1120,7 +1121,7 @@ class Scenery {
                                                    0.5 + Math.random() * 0.4,
                                                    0.2 + Math.random() * 0.2);
     leafMaterial.specularColor = BABYLON.Color3.Gray();
-    let tree = QuickShrub( sizeBranch, leafMaterial, this._scene)
+    let tree = QuickShrub(sizeBranch, leafMaterial, this._scene);
     tree.setEnabled(false);
     tree.name += "_" + this._treeSpecies;
     this._treeSpecies++;
@@ -1143,8 +1144,8 @@ class Scenery {
     let decalMaterial = new BABYLON.StandardMaterial(flowers[image], this._scene);
     decalMaterial.diffuseTexture = new BABYLON.Texture(
       "textures/groundcover/" + flowers[image], this._scene);
-		decalMaterial.diffuseTexture.hasAlpha = true;
-    decalMaterial.zOffset = -Math.round(this._groundCoverTypes.length / 2 +1);
+    decalMaterial.diffuseTexture.hasAlpha = true;
+    decalMaterial.zOffset = -Math.round(this._groundCoverTypes.length / 2 + 1);
     decalMaterial.specularColor = new BABYLON.Color3(0, 0, 0);
       decalMaterial.disableDepthWrite = false;
       decalMaterial.forceDepthWrite = true;
@@ -1153,7 +1154,7 @@ class Scenery {
   }
 
   _applyGroundCover(x: number, y: number) : void {
-    for(let i = 0; i < Math.random() * 3; i++) {
+    for (let i = 0; i < Math.random() * 3; i++) {
       let decalScale = 20 + Math.random() * 40;
       let decalSize = BABYLON.Vector3.One().scale(decalScale);
       let decalRotate = Math.PI * 2 * Math.random();
@@ -1167,35 +1168,35 @@ class Scenery {
          angle: decalRotate
         });
 
-      let materialIndex = Math.round(Math.random() * (this._groundCoverTypes.length -1));
+      let materialIndex = Math.round(Math.random() * (this._groundCoverTypes.length - 1));
       let proposedMaterial = this._groundCoverTypes[materialIndex];
       let decalHeight = proposedMaterial.zOffset;
 
       // Check the proposed material does not clash with an overlapping material
       // at the same zOffset.
       let noConflict = true;
-      for(let decalCoverX = x - Math.round(decalScale / 2);
+      for (let decalCoverX = x - Math.round(decalScale / 2);
           decalCoverX < x + Math.round(decalScale / 2) && noConflict;
           decalCoverX++) {
-        for(let decalCoverY = y - Math.round(decalScale / 2);
+        for (let decalCoverY = y - Math.round(decalScale / 2);
             decalCoverY < y + Math.round(decalScale / 2);
             decalCoverY++) {
           let key = "" + decalCoverX + "_" + decalCoverY + "_" + decalHeight;
-          if(this._groundCover[key]) {
+          if (this._groundCover[key]) {
             // Already exists.
             noConflict = false;
             break;
           }
         }
       }
-      
-      if(noConflict) {
+
+      if (noConflict) {
         newDecal.material = proposedMaterial;
         // Set a record of where this decal covers and at what zOffset.
-        for(let decalCoverX = x - Math.round(decalScale / 2);
+        for (let decalCoverX = x - Math.round(decalScale / 2);
             decalCoverX < x + Math.round(decalScale / 2) && noConflict;
             decalCoverX++) {
-          for(let decalCoverY = y - Math.round(decalScale / 2);
+          for (let decalCoverY = y - Math.round(decalScale / 2);
               decalCoverY < y + Math.round(decalScale / 2);
               decalCoverY++) {
             let key = "" + decalCoverX + "_" + decalCoverY + "_" + decalHeight;
@@ -1219,17 +1220,17 @@ class Camera {
   private _scene: BABYLON.Scene;
   private _cameraArc: BABYLON.ArcRotateCamera;
   private _cameraUniversal: BABYLON.UniversalCamera;
-  private _cameraFollow:BABYLON.FollowCamera;
+  private _cameraFollow: BABYLON.FollowCamera;
   //private _selectedActor: 0;
   private _target: BABYLON.Mesh;
-  
+
   readonly cameras: CameraDescription[];
 
   constructor(canvas: HTMLCanvasElement, scene: BABYLON.Scene, actors: Character[]) {
     this._canvas = canvas;
     this._scene = scene;
     this.cameras = [];
-    
+
     this._target = BABYLON.MeshBuilder.CreateSphere(
       "targetCamera", {diameterX: 0.1, diameterY: 0.1, diameterZ: 0.1}, this._scene);
     this._target.position = new BABYLON.Vector3(100, 40, 100);
@@ -1248,12 +1249,12 @@ class Camera {
     this.cameras.push({"name": "ArcRotate", "camera": this._cameraArc});
 
     this._cameraUniversal = new BABYLON.UniversalCamera(
-      "UniversalCamera", new BABYLON.Vector3(0, 0, -10), this._scene);
+      "UniversalCamera", new BABYLON.Vector3(0, 0, - 10), this._scene);
     this._cameraUniversal.setTarget(this._target.position);
     this.cameras.push({"name": "Universal", "camera": this._cameraUniversal});
 
     this._cameraFollow = new BABYLON.FollowCamera(
-      "FollowCamera", new BABYLON.Vector3(0, 1, -10), this._scene);
+      "FollowCamera", new BABYLON.Vector3(0, 1, - 10), this._scene);
     this._cameraFollow.radius = 10;
     this._cameraFollow.heightOffset = 1;
     this._cameraFollow.rotationOffset = 180 / 4;
@@ -1264,9 +1265,9 @@ class Camera {
     //this._cameraFollow.lowerRadiusLimit = 3;
     //this._cameraFollow.lowerHeightOffsetLimit = 1;
     this.cameras.push({"name": "Follow", "camera": this._cameraFollow});
-    
+
     this._scene.onBeforeRenderObservable.add(() => {
-      if(this._cameraArc.getTarget() != this._target.position) {
+      if (this._cameraArc.getTarget() != this._target.position) {
         this._cameraArc.setTarget(this._target.position);
       }
       //this._cameraArc.rebuildAnglesAndRadius();
@@ -1283,8 +1284,8 @@ class Camera {
       30,
       BABYLON.Animation.ANIMATIONTYPE_VECTOR3,
       BABYLON.Animation.ANIMATIONLOOPMODE_CYCLE);
-		
-		// Animation keys
+
+    // Animation keys
     var keys = [];
     keys.push({ frame: 0, value: this._target.position });
     keys.push({ frame: 120, value: targetPosition });
@@ -1300,7 +1301,7 @@ class Camera {
 
   setEnabled(camera: CameraDescription): void {
     console.log(camera, this._scene.activeCamera.name);
-    if(this._scene.activeCamera.name == "UniversalCamera") {
+    if (this._scene.activeCamera.name == "UniversalCamera") {
       // Move the camera target in front of old camera to allow for animation to
       // new camera orientation.
       let distance = BABYLON.Vector3.Distance(
@@ -1313,20 +1314,20 @@ class Camera {
     this._cameraFollow.detachControl(this._canvas);
 
     // Set the new camera.
-    if(camera.name === "ArcRotate") {
+    if (camera.name === "ArcRotate") {
       this._cameraArc.setPosition(this._scene.activeCamera.position);
       this._cameraArc.rebuildAnglesAndRadius();
       this._cameraArc.attachControl(this._canvas, true, false);
       this._scene.activeCamera = this._cameraArc;
-    } else if(camera.name === "Universal") {
+    } else if (camera.name === "Universal") {
       this._cameraUniversal.attachControl(this._canvas, true);
       this._cameraUniversal.position = this._scene.activeCamera.position;
       this._cameraUniversal.setTarget(this._target.position);
       this._scene.activeCamera = this._cameraUniversal;
-    } else if(camera.name === "Follow") {
+    } else if (camera.name === "Follow") {
       this._cameraFollow.position = this._scene.activeCamera.position;
       this._scene.activeCamera = this._cameraFollow;
-      
+
       this._cameraFollow.inputs.attachInput(
         this._cameraFollow.inputs.attached.FollowCameraControls);
       this._cameraFollow.attachControl(this._canvas, true);
@@ -1361,7 +1362,7 @@ class Game {
     this._scene.fogColor = new BABYLON.Color3(0.2, 0.2, 0.2);
     this._scene.fogDensity = 0.003;
 
-		// Skybox
+    // Skybox
     this._skybox = BABYLON.Mesh.CreateBox("skyBox", 1000.0, this._scene);
     this._skybox.scaling.y = 0.125;
     var skyboxMaterial = new BABYLON.StandardMaterial("skyBox", this._scene);
@@ -1374,9 +1375,9 @@ class Game {
     this._skybox.material = skyboxMaterial;
     this._skybox.setEnabled(false);
 
-		// Lighting
+    // Lighting
     this._light = new BABYLON.DirectionalLight(
-      "dir01", new BABYLON.Vector3(0, -0.5, -1.0), this._scene);
+      "dir01", new BABYLON.Vector3(0, -0.5, - 1.0), this._scene);
     this._light.position = new BABYLON.Vector3(20, 150, 70);
     let sun = BABYLON.MeshBuilder.CreateSphere("sun", {}, this._scene);
     sun.position = this._light.position;
@@ -1402,7 +1403,7 @@ class Game {
     let scenery = new Scenery(this._scene, shadowGenerator, ground, 256);
     scenery.calculatePath({"x": 255, "y": 255}, {"x": 0, "y": 0});
 
-    this._scene.onPointerDown = function (evt, pickResult) {
+    this._scene.onPointerDown = function(evt, pickResult) {
         // if the click hits the ground object, we change the impact position
         if (pickResult.hit) {
             targetHead.position.x = pickResult.pickedPoint.x;
@@ -1410,7 +1411,7 @@ class Game {
             targetHead.position.z = pickResult.pickedPoint.z;
         }
     };
-    
+
     // Meshes
     // World positions: (l/r, u/d, f/b)
     // let debugBase = BABYLON.MeshBuilder.CreateBox("debugBase", {height: 0.01, width: 0.5, depth: 1}, this._scene);
@@ -1451,7 +1452,7 @@ class Game {
       console.log("Add walk animation.");
       fox.queueAnimation({name: "walk", loop: true, reversed: false});
     }.bind(this), 30000);
-    
+
     this.controlPannel();
     console.log("Total meshes in scene: %c" +
                 this._scene.meshes.length.toString(),
@@ -1476,9 +1477,9 @@ class Game {
   }
 
   controlPannel() : void {
-    let advancedTexture = BABYLON.GUI.AdvancedDynamicTexture.CreateFullscreenUI("UI")
+    let advancedTexture = BABYLON.GUI.AdvancedDynamicTexture.CreateFullscreenUI("UI");
 
-    let grid = new BABYLON.GUI.Grid();   
+    let grid = new BABYLON.GUI.Grid();
     grid.addColumnDefinition(10, true);
     grid.addColumnDefinition(200, true);
     grid.addRowDefinition(20, true);
@@ -1501,26 +1502,26 @@ class Game {
     checkbox.isChecked = false;
     checkbox.color = "green";
     checkbox.onIsCheckedChangedObservable.add((value) => {
-			console.log("%c SkyBox:", "background: blue; color: white", value);
+      console.log("%c SkyBox:", "background: blue; color: white", value);
       this._skybox.setEnabled(value);
     });
     grid.addControl(checkbox, gridcount, 0);
-    
+
     let header = BABYLON.GUI.Control.AddHeader(
       checkbox, "SkyBox", "180px", { isHorizontal: true, controlFirst: true});
     header.color = "white";
     header.height = "20px";
-    header.horizontalAlignment = BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_LEFT
+    header.horizontalAlignment = BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
     grid.addControl(header, gridcount++, 1);
-    
+
     let checkbox2 = new BABYLON.GUI.Checkbox();
     checkbox2.width = "20px";
     checkbox2.height = "20px";
     checkbox2.isChecked = true;
     checkbox2.color = "green";
     checkbox2.onIsCheckedChangedObservable.add((value) => {
-			console.log("%c Fog:", "background: blue; color: white", value);
-      if(value) {
+      console.log("%c Fog:", "background: blue; color: white", value);
+      if (value) {
         this._scene.fogMode = BABYLON.Scene.FOGMODE_EXP2;
       } else {
         //this._scene.fogMode = BABYLON.Scene.FOGMODE_LINEAR;
@@ -1535,7 +1536,7 @@ class Game {
       checkbox2, "Fog", "180px", { isHorizontal: true, controlFirst: true});
     header2.color = "white";
     header2.height = "20px";
-    header2.horizontalAlignment = BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_LEFT
+    header2.horizontalAlignment = BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
     grid.addControl(header2, gridcount++, 1);
 
     this._camera.cameras.forEach((camera) => {
@@ -1546,7 +1547,7 @@ class Game {
       radio.isChecked = (camera.name === "ArcRotate");
       radio.onIsCheckedChangedObservable.add((state) => {
         console.log(camera.name, state);
-        if(state) {
+        if (state) {
           this._camera.setEnabled(camera);
         }
       });
@@ -1556,19 +1557,19 @@ class Game {
         radio, "Camera: " + camera.name, "180px", { isHorizontal: true, controlFirst: true});
       radioHead.color = "white";
       radioHead.height = "20px";
-      radioHead.horizontalAlignment = BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_LEFT
+      radioHead.horizontalAlignment = BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
       grid.addControl(radioHead, gridcount++, 1);
     }, this);
   }
 }
 
 window.addEventListener('DOMContentLoaded', () => {
-	// Create the game using the 'renderCanvas'.
-	let game = new Game('renderCanvas');
+  // Create the game using the 'renderCanvas'.
+  let game = new Game('renderCanvas');
 
-	// Create the scene.
-	game.createScene();
+  // Create the scene.
+  game.createScene();
 
-	// Start render loop.
-	game.doRender();
+  // Start render loop.
+  game.doRender();
 });

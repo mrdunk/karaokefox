@@ -57,7 +57,7 @@ class MyStack<Tvalue> {
   }
 
   pop(): Tvalue {
-    if(this._container.lengthPopulated === 0) {
+    if (this._container.lengthPopulated === 0) {
       return;
     }
     this._container.lengthPopulated--;
@@ -69,7 +69,7 @@ class MyStack<Tvalue> {
   }
 
   push(newValue: Tvalue): void {
-    if(this._container.lengthPopulated === this._container.length) {
+    if (this._container.lengthPopulated === this._container.length) {
       this._container.length += this._size;
     }
     this._container[this._container.lengthPopulated] = newValue;
@@ -102,7 +102,7 @@ class MyQueue<Tvalue> {
   }
 
   pop(): Tvalue {
-    if(this._head === undefined) {
+    if (this._head === undefined) {
       return undefined;
     }
     let returnNode = this._head;
@@ -115,7 +115,7 @@ class MyQueue<Tvalue> {
   push(newValue: Tvalue): void {
     let node = new MyQueueNode<Tvalue>(newValue);
 
-    if(this._head === undefined) {
+    if (this._head === undefined) {
       this._head = this._tail = node;
       this.length = 1;
       return;
@@ -141,7 +141,7 @@ class MyMap<Tkey, Tvalue> {
   get(key: Tkey): Tvalue {
     let subContainer = this._container;
     this._getProperties.forEach((getProperty) => {
-      if(subContainer !== undefined) {
+      if (subContainer !== undefined) {
         let subKey: number = getProperty(key);
         subContainer = subContainer[subKey];
       }
@@ -155,18 +155,18 @@ class MyMap<Tkey, Tvalue> {
     let returnVal: Tvalue;
     let subContainer = this._container;
     address.forEach((subKey, index, array) => {
-      if(index < array.length -1) {
+      if (index < array.length - 1) {
         subContainer = subContainer[subKey];
       } else {
-        returnVal = subContainer[subContainer.lengthPopulated -1];
-        //delete subContainer[subContainer.lengthPopulated -1];
-        subContainer[subContainer.lengthPopulated -1] = null;
-        if(returnVal !== undefined) {
+        returnVal = subContainer[subContainer.lengthPopulated - 1];
+        //delete subContainer[subContainer.lengthPopulated - 1];
+        subContainer[subContainer.lengthPopulated - 1] = null;
+        if (returnVal !== undefined) {
           subContainer.lengthPopulated--;
           this.length--;
         }
-        while(subContainer.lengthPopulated > 0 &&
-              subContainer[subContainer.lengthPopulated -1] === undefined) {
+        while (subContainer.lengthPopulated > 0 &&
+               subContainer[subContainer.lengthPopulated - 1] === undefined) {
           // While this is expensive, it will only happen for cases when
           // there are empty spaces to the "left" of the pop-ed value.
           subContainer.lengthPopulated--;
@@ -179,9 +179,9 @@ class MyMap<Tkey, Tvalue> {
   private _popRecurse(rContainer: []): number[] {
     let returnVal: number[] = [];
     rContainer.forEach((node, index, array) => {
-      if(returnVal.length === 0) {
-        if(Array.isArray(array[index])) {
-          if((<BigArray>(array[index])).lengthPopulated > 0) {
+      if (returnVal.length === 0) {
+        if (Array.isArray(array[index])) {
+          if ((<BigArray>(array[index])).lengthPopulated > 0) {
             returnVal = [index].concat(this._popRecurse(array[index]));
           }
         } else {
@@ -196,19 +196,19 @@ class MyMap<Tkey, Tvalue> {
     let subContainer = this._container;
     this._getProperties.forEach((getProperty, index, array) => {
       let subKey: number = getProperty(key);
-      console.assert(subKey !== undefined, 
+      console.assert(subKey !== undefined,
                      ("Problem running " + getProperty.name + " on " + key));
-      if(index < array.length -1) {
-        while(subContainer.lengthPopulated -1 < subKey) {
+      if (index < array.length - 1) {
+        while (subContainer.lengthPopulated - 1 < subKey) {
           //subContainer.push(new BigArray(10));
           subContainer[subContainer.lengthPopulated] = new BigArray(10);
           subContainer.lengthPopulated++;
         }
         subContainer = subContainer[subKey];
       } else {
-        if(subContainer[subKey] === undefined) {
+        if (subContainer[subKey] === undefined) {
           subContainer[subKey] = value;
-          subContainer.lengthPopulated = Math.max(subKey +1, subContainer.lengthPopulated);
+          subContainer.lengthPopulated = Math.max(subKey + 1, subContainer.lengthPopulated);
           this.length++;
         }
       }
@@ -217,19 +217,19 @@ class MyMap<Tkey, Tvalue> {
 
   del(key: Tkey): Tvalue {
     let returnVal: Tvalue;
-    
+
     let subContainer = this._container;
     this._getProperties.forEach((getProperty, index, array) => {
       let subKey: number = getProperty(key);
       console.assert(subKey !== undefined);
-      if(index < array.length -1) {
+      if (index < array.length - 1) {
         let subKey: number = getProperty(key);
         subContainer = subContainer[subKey];
       } else {
         returnVal = subContainer[subKey];
         //delete subContainer[subKey];
         subContainer[subKey] = null;
-        if(returnVal !== undefined) {
+        if (returnVal !== undefined) {
           subContainer.lengthPopulated--;
           this.length--;
         }
@@ -256,9 +256,9 @@ class PriorityQueue<T> {
     let item: T;
 
     this._container.forEach((n, index, array) => {
-      let reverseIndex = this._container.length - index -1;
-      
-      if(item === undefined && array[reverseIndex].length) {
+      let reverseIndex = this._container.length - index - 1;
+
+      if (item === undefined && array[reverseIndex].length) {
         item = array[reverseIndex].pop();
         console.assert(item !== undefined);
         this.length--;
@@ -272,8 +272,8 @@ class PriorityQueue<T> {
     let item: T;
 
     this._container.forEach((n, index, array) => {
-      if(item === undefined && array[index].length) {
-        item = array[index].pop()
+      if (item === undefined && array[index].length) {
+        item = array[index].pop();
         console.assert(item !== undefined);
         this.length--;
       }
@@ -287,7 +287,7 @@ class PriorityQueue<T> {
     console.assert(priority === Math.round(priority),
                    "Priority must be an intiger.");
 
-    while(this._container.length < priority + 1) {
+    while (this._container.length < priority + 1) {
       // Add new priority sub-container.
       let container = new MyStack<T>();
       this._container.push(container);
@@ -648,7 +648,7 @@ class ProfileContainers {
 
   manyPush(container): void {
     console.assert(container.length === 0);
-    for(let i = 0; i < 100000; i++) {
+    for (let i = 0; i < 100000; i++) {
       container.push(i);
     }
     console.assert(container.length === 100000);
@@ -656,18 +656,18 @@ class ProfileContainers {
 
   manyPushPop(container): void {
     console.assert(container.length === 0);
-    for(let i = 0; i < 100000; i++) {
+    for (let i = 0; i < 100000; i++) {
       container.push(i);
     }
     console.assert(container.length === 100000);
 
-    for(let i = 0; i < 100000 -1; i++) {
+    for (let i = 0; i < 100000 - 1; i++) {
       container.pop();
     }
     console.assert(container.length === 1);
     let val = container.pop();
     console.assert(container.length === 0);
-    console.assert(val === 0 || val === 100000 -1);
+    console.assert(val === 0 || val === 100000 - 1);
   }
 
   testTrivialStack(): void {
