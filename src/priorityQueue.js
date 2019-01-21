@@ -1,109 +1,89 @@
-var __extends = (this && this.__extends) || (function () {
-    var extendStatics = function (d, b) {
-        extendStatics = Object.setPrototypeOf ||
-            ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
-            function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
-        return extendStatics(d, b);
-    };
-    return function (d, b) {
-        extendStatics(d, b);
-        function __() { this.constructor = d; }
-        d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
-    };
-})();
-var BigArray = /** @class */ (function (_super) {
-    __extends(BigArray, _super);
-    function BigArray() {
-        var _this = _super !== null && _super.apply(this, arguments) || this;
-        _this.lengthPopulated = 0;
-        return _this;
+class BigArray extends Array {
+    constructor() {
+        super(...arguments);
+        this.lengthPopulated = 0;
     }
-    return BigArray;
-}(Array));
-var TrivialStack = /** @class */ (function () {
-    function TrivialStack() {
+}
+class TrivialStack {
+    constructor() {
         this.length = 0;
         this._container = [];
     }
-    TrivialStack.prototype.pop = function () {
-        var value = this._container.pop();
+    pop() {
+        let value = this._container.pop();
         this.length = this._container.length;
         return value;
-    };
-    TrivialStack.prototype.push = function (newValue) {
+    }
+    push(newValue) {
         this._container.push(newValue);
         this.length = this._container.length;
-    };
-    return TrivialStack;
-}());
-var TrivialQueue = /** @class */ (function () {
-    function TrivialQueue() {
+    }
+}
+class TrivialQueue {
+    constructor() {
         this.length = 0;
         this._container = [];
     }
-    TrivialQueue.prototype.pop = function () {
-        var value = this._container.pop();
+    pop() {
+        let value = this._container.pop();
         this.length = this._container.length;
         return value;
-    };
-    TrivialQueue.prototype.push = function (newValue) {
+    }
+    push(newValue) {
         this._container.unshift(newValue);
         this.length = this._container.length;
-    };
-    return TrivialQueue;
-}());
-var MyStack = /** @class */ (function () {
-    function MyStack(size) {
+    }
+}
+class MyStack {
+    constructor(size) {
         size = size || 10;
         this.length = 0;
         this._container = new BigArray(size);
         this._size = size;
     }
-    MyStack.prototype.pop = function () {
+    pop() {
         if (this._container.lengthPopulated === 0) {
             return;
         }
         this._container.lengthPopulated--;
         this.length = this._container.lengthPopulated;
-        var value = this._container[this._container.lengthPopulated];
+        let value = this._container[this._container.lengthPopulated];
         //delete this._container[this._container.lengthPopulated];
         this._container[this._container.lengthPopulated] = null;
         return value;
-    };
-    MyStack.prototype.push = function (newValue) {
+    }
+    push(newValue) {
         if (this._container.lengthPopulated === this._container.length) {
             this._container.length += this._size;
         }
         this._container[this._container.lengthPopulated] = newValue;
         this._container.lengthPopulated++;
         this.length = this._container.lengthPopulated;
-    };
-    return MyStack;
-}());
-var MyQueueNode = /** @class */ (function () {
-    function MyQueueNode(value) {
+    }
+}
+class MyQueueNode {
+    constructor(value) {
         this.value = value;
     }
-    return MyQueueNode;
-}());
-var MyQueue = /** @class */ (function () {
-    function MyQueue(size) {
+}
+class MyQueue {
+    constructor(size) {
         size = size || 10;
         this.length = 0;
         //this._container = new BigArray(size);
         //this._size = size;
     }
-    MyQueue.prototype.pop = function () {
+    pop() {
         if (this._head === undefined) {
             return undefined;
         }
-        var returnNode = this._head;
+        let returnNode = this._head;
         this._head = this._head.next;
         this.length--;
         return returnNode.value;
-    };
-    MyQueue.prototype.push = function (newValue) {
-        var node = new MyQueueNode(newValue);
+    }
+    push(newValue) {
+        let node = new MyQueueNode(newValue);
         if (this._head === undefined) {
             this._head = this._tail = node;
             this.length = 1;
@@ -112,35 +92,29 @@ var MyQueue = /** @class */ (function () {
         this._tail.next = node;
         this._tail = node;
         this.length++;
-    };
-    return MyQueue;
-}());
-var MyMap = /** @class */ (function () {
-    function MyMap() {
-        var getProperties = [];
-        for (var _i = 0; _i < arguments.length; _i++) {
-            getProperties[_i] = arguments[_i];
-        }
+    }
+}
+class MyMap {
+    constructor(...getProperties) {
         this.length = 0;
         this._container = new BigArray(10);
         this._getProperties = getProperties;
     }
-    MyMap.prototype.get = function (key) {
-        var subContainer = this._container;
-        this._getProperties.forEach(function (getProperty) {
+    get(key) {
+        let subContainer = this._container;
+        this._getProperties.forEach((getProperty) => {
             if (subContainer !== undefined) {
-                var subKey = getProperty(key);
+                let subKey = getProperty(key);
                 subContainer = subContainer[subKey];
             }
         });
         return subContainer;
-    };
-    MyMap.prototype.pop = function () {
-        var _this = this;
-        var address = this._popRecurse(this._container);
-        var returnVal;
-        var subContainer = this._container;
-        address.forEach(function (subKey, index, array) {
+    }
+    pop() {
+        let address = this._popRecurse(this._container);
+        let returnVal;
+        let subContainer = this._container;
+        address.forEach((subKey, index, array) => {
             if (index < array.length - 1) {
                 subContainer = subContainer[subKey];
             }
@@ -150,7 +124,7 @@ var MyMap = /** @class */ (function () {
                 subContainer[subContainer.lengthPopulated - 1] = null;
                 if (returnVal !== undefined) {
                     subContainer.lengthPopulated--;
-                    _this.length--;
+                    this.length--;
                 }
                 while (subContainer.lengthPopulated > 0 &&
                     subContainer[subContainer.lengthPopulated - 1] === undefined) {
@@ -161,15 +135,14 @@ var MyMap = /** @class */ (function () {
             }
         });
         return returnVal;
-    };
-    MyMap.prototype._popRecurse = function (rContainer) {
-        var _this = this;
-        var returnVal = [];
-        rContainer.forEach(function (node, index, array) {
+    }
+    _popRecurse(rContainer) {
+        let returnVal = [];
+        rContainer.forEach((node, index, array) => {
             if (returnVal.length === 0) {
                 if (Array.isArray(array[index])) {
                     if ((array[index]).lengthPopulated > 0) {
-                        returnVal = [index].concat(_this._popRecurse(array[index]));
+                        returnVal = [index].concat(this._popRecurse(array[index]));
                     }
                 }
                 else {
@@ -178,12 +151,11 @@ var MyMap = /** @class */ (function () {
             }
         });
         return returnVal;
-    };
-    MyMap.prototype.put = function (key, value) {
-        var _this = this;
-        var subContainer = this._container;
-        this._getProperties.forEach(function (getProperty, index, array) {
-            var subKey = getProperty(key);
+    }
+    put(key, value) {
+        let subContainer = this._container;
+        this._getProperties.forEach((getProperty, index, array) => {
+            let subKey = getProperty(key);
             console.assert(subKey !== undefined, ("Problem running " + getProperty.name + " on " + key));
             if (index < array.length - 1) {
                 while (subContainer.lengthPopulated - 1 < subKey) {
@@ -197,21 +169,20 @@ var MyMap = /** @class */ (function () {
                 if (subContainer[subKey] === undefined) {
                     subContainer[subKey] = value;
                     subContainer.lengthPopulated = Math.max(subKey + 1, subContainer.lengthPopulated);
-                    _this.length++;
+                    this.length++;
                 }
             }
         });
-    };
-    MyMap.prototype.del = function (key) {
-        var _this = this;
-        var returnVal;
-        var subContainer = this._container;
-        this._getProperties.forEach(function (getProperty, index, array) {
-            var subKey = getProperty(key);
+    }
+    del(key) {
+        let returnVal;
+        let subContainer = this._container;
+        this._getProperties.forEach((getProperty, index, array) => {
+            let subKey = getProperty(key);
             console.assert(subKey !== undefined);
             if (index < array.length - 1) {
-                var subKey_1 = getProperty(key);
-                subContainer = subContainer[subKey_1];
+                let subKey = getProperty(key);
+                subContainer = subContainer[subKey];
             }
             else {
                 returnVal = subContainer[subKey];
@@ -219,78 +190,69 @@ var MyMap = /** @class */ (function () {
                 subContainer[subKey] = null;
                 if (returnVal !== undefined) {
                     subContainer.lengthPopulated--;
-                    _this.length--;
+                    this.length--;
                 }
             }
         });
         return returnVal;
-    };
-    return MyMap;
-}());
-var PriorityQueue = /** @class */ (function () {
-    function PriorityQueue() {
-        var getProperties = [];
-        for (var _i = 0; _i < arguments.length; _i++) {
-            getProperties[_i] = arguments[_i];
-        }
+    }
+}
+class PriorityQueue {
+    constructor(...getProperties) {
         this._getProperties = getProperties;
         this._container = [];
         this.length = 0;
     }
     /* Pop item from highest priority sub-queue. */
-    PriorityQueue.prototype.pop = function () {
-        var _this = this;
-        var item;
-        this._container.forEach(function (n, index, array) {
-            var reverseIndex = _this._container.length - index - 1;
+    pop() {
+        let item;
+        this._container.forEach((n, index, array) => {
+            let reverseIndex = this._container.length - index - 1;
             if (item === undefined && array[reverseIndex].length) {
                 item = array[reverseIndex].pop();
                 console.assert(item !== undefined);
-                _this.length--;
+                this.length--;
             }
         });
         return item;
-    };
+    }
     /* Pop item from lowest priority sub-queue. */
-    PriorityQueue.prototype.popLow = function () {
-        var _this = this;
-        var item;
-        this._container.forEach(function (n, index, array) {
+    popLow() {
+        let item;
+        this._container.forEach((n, index, array) => {
             if (item === undefined && array[index].length) {
                 item = array[index].pop();
                 console.assert(item !== undefined);
-                _this.length--;
+                this.length--;
             }
         });
         return item;
-    };
+    }
     /* Add item at specified priority. */
-    PriorityQueue.prototype.push = function (item, priority) {
+    push(item, priority) {
         console.assert(item !== undefined);
         console.assert(priority === Math.round(priority), "Priority must be an intiger.");
         while (this._container.length < priority + 1) {
             // Add new priority sub-container.
-            var container = new MyStack();
+            let container = new MyStack();
             this._container.push(container);
         }
         this._container[priority].push(item);
         this.length++;
-    };
-    return PriorityQueue;
-}());
-var TestMyStack = /** @class */ (function () {
-    function TestMyStack() {
-        var _this = this;
-        var tests = [this.test_push, this.test_pop];
-        tests.forEach(function (test) {
-            _this._init();
-            test.bind(_this)();
+    }
+}
+class TestMyStack {
+    constructor() {
+        let tests = [this.test_push, this.test_pop];
+        tests.forEach((test) => {
+            this._init();
+            test.bind(this)();
         }, this);
     }
-    TestMyStack.prototype._init = function () {
+    _init() {
         this._container = new MyStack();
-    };
-    TestMyStack.prototype.test_push = function () {
+    }
+    test_push() {
         console.log("test_push");
         console.assert(this._container.length === 0);
         this._container.push(1);
@@ -299,8 +261,8 @@ var TestMyStack = /** @class */ (function () {
         console.assert(this._container.length === 2);
         this._container.push(3);
         console.assert(this._container.length === 3);
-    };
-    TestMyStack.prototype.test_pop = function () {
+    }
+    test_pop() {
         console.log("test_pop");
         console.assert(this._container.length === 0);
         this._container.push(1);
@@ -308,7 +270,7 @@ var TestMyStack = /** @class */ (function () {
         this._container.push(3);
         this._container.push(4);
         console.assert(this._container.length === 4);
-        var val = this._container.pop();
+        let val = this._container.pop();
         console.assert(val === 4);
         console.assert(this._container.length === 3);
         val = this._container.pop();
@@ -319,22 +281,20 @@ var TestMyStack = /** @class */ (function () {
         val = this._container.pop();
         console.assert(val === undefined);
         console.assert(this._container.length === 0);
-    };
-    return TestMyStack;
-}());
-var TestMyQueue = /** @class */ (function () {
-    function TestMyQueue() {
-        var _this = this;
-        var tests = [this.test_push, this.test_pop];
-        tests.forEach(function (test) {
-            _this._init();
-            test.bind(_this)();
+    }
+}
+class TestMyQueue {
+    constructor() {
+        let tests = [this.test_push, this.test_pop];
+        tests.forEach((test) => {
+            this._init();
+            test.bind(this)();
         }, this);
     }
-    TestMyQueue.prototype._init = function () {
+    _init() {
         this._container = new MyQueue();
-    };
-    TestMyQueue.prototype.test_push = function () {
+    }
+    test_push() {
         console.log("test_push");
         console.assert(this._container.length === 0);
         this._container.push(1);
@@ -343,8 +303,8 @@ var TestMyQueue = /** @class */ (function () {
         console.assert(this._container.length === 2);
         this._container.push(3);
         console.assert(this._container.length === 3);
-    };
-    TestMyQueue.prototype.test_pop = function () {
+    }
+    test_pop() {
         console.log("test_pop");
         console.assert(this._container.length === 0);
         this._container.push(1);
@@ -352,7 +312,7 @@ var TestMyQueue = /** @class */ (function () {
         this._container.push(3);
         this._container.push(4);
         console.assert(this._container.length === 4);
-        var val = this._container.pop();
+        let val = this._container.pop();
         console.assert(val === 1);
         console.assert(this._container.length === 3);
         val = this._container.pop();
@@ -363,19 +323,17 @@ var TestMyQueue = /** @class */ (function () {
         val = this._container.pop();
         console.assert(val === undefined);
         console.assert(this._container.length === 0);
-    };
-    return TestMyQueue;
-}());
-var TestMyMap = /** @class */ (function () {
-    function TestMyMap() {
-        var _this = this;
-        var tests = [this.test_put, this.test_get, this.test_del, this.test_pop];
-        tests.forEach(function (test) {
-            _this._init();
-            test.bind(_this)();
+    }
+}
+class TestMyMap {
+    constructor() {
+        let tests = [this.test_put, this.test_get, this.test_del, this.test_pop];
+        tests.forEach((test) => {
+            this._init();
+            test.bind(this)();
         }, this);
     }
-    TestMyMap.prototype._init = function () {
+    _init() {
         function getX(node) {
             return node.x;
         }
@@ -383,8 +341,8 @@ var TestMyMap = /** @class */ (function () {
             return node.y;
         }
         this._container = new MyMap(getX, getY);
-    };
-    TestMyMap.prototype.test_put = function () {
+    }
+    test_put() {
         console.log("test_put");
         console.assert(this._container.length === 0);
         this._container.put({ "x": 1, "y": 2 }, 3);
@@ -402,8 +360,8 @@ var TestMyMap = /** @class */ (function () {
         console.assert(this._container.length === 5);
         this._container.put({ "x": 0, "y": 0 }, 9);
         console.assert(this._container.length === 6);
-    };
-    TestMyMap.prototype.test_get = function () {
+    }
+    test_get() {
         console.log("test_get");
         console.assert(this._container.length === 0);
         this._container.put({ "x": 0, "y": 2 }, 1);
@@ -420,8 +378,8 @@ var TestMyMap = /** @class */ (function () {
         console.assert(this._container.get({ "x": 3, "y": 1 }) === 5);
         console.assert(this._container.get({ "x": 3, "y": 2 }) === 6);
         console.assert(this._container.get({ "x": 3, "y": 3 }) === undefined);
-    };
-    TestMyMap.prototype.test_del = function () {
+    }
+    test_del() {
         console.log("test_del");
         console.assert(this._container.length === 0);
         this._container.put({ "x": 0, "y": 2 }, 1);
@@ -443,8 +401,8 @@ var TestMyMap = /** @class */ (function () {
         console.assert(this._container.del({ "x": 3, "y": 2 }) === 6);
         console.assert(this._container.del({ "x": 3, "y": 3 }) === undefined);
         console.assert(this._container.length === 0);
-    };
-    TestMyMap.prototype.test_pop = function () {
+    }
+    test_pop() {
         console.log("test_pop");
         console.assert(this._container.length === 0);
         this._container.put({ "x": 0, "y": 2 }, 1);
@@ -454,7 +412,7 @@ var TestMyMap = /** @class */ (function () {
         this._container.put({ "x": 4, "y": 0 }, 4);
         this._container.put({ "x": 4, "y": 2 }, 6);
         console.assert(this._container.length === 6);
-        var val = this._container.pop();
+        let val = this._container.pop();
         console.assert(val >= 1 && val <= 6);
         console.assert(this._container.length === 5);
         val = this._container.pop();
@@ -475,19 +433,17 @@ var TestMyMap = /** @class */ (function () {
         val = this._container.pop();
         console.assert(val === undefined);
         console.assert(this._container.length === 0);
-    };
-    return TestMyMap;
-}());
-var TestPriorityQueue = /** @class */ (function () {
-    function TestPriorityQueue() {
-        var _this = this;
-        var tests = [this.test_push, this.test_pop, this.test_popLow];
-        tests.forEach(function (test) {
-            _this._init();
-            test.bind(_this)();
+    }
+}
+class TestPriorityQueue {
+    constructor() {
+        let tests = [this.test_push, this.test_pop, this.test_popLow];
+        tests.forEach((test) => {
+            this._init();
+            test.bind(this)();
         }, this);
     }
-    TestPriorityQueue.prototype._init = function () {
+    _init() {
         function getX(node) {
             return node.x;
         }
@@ -495,8 +451,8 @@ var TestPriorityQueue = /** @class */ (function () {
             return node.y;
         }
         this._pq = new PriorityQueue(getX, getY);
-    };
-    TestPriorityQueue.prototype.test_push = function () {
+    }
+    test_push() {
         console.log("test_push");
         console.assert(this._pq.length === 0);
         this._pq.push({ "x": 1, "y": 1 }, 1);
@@ -505,8 +461,8 @@ var TestPriorityQueue = /** @class */ (function () {
         this._pq.push({ "x": 2, "y": 1 }, 1);
         this._pq.push({ "x": 1, "y": 0 }, 1);
         console.assert(this._pq.length === 4);
-    };
-    TestPriorityQueue.prototype.test_pop = function () {
+    }
+    test_pop() {
         console.log("test_pop");
         this._pq.push({ "x": 1, "y": 0 }, 1);
         this._pq.push({ "x": 1, "y": 1 }, 1);
@@ -515,27 +471,27 @@ var TestPriorityQueue = /** @class */ (function () {
         this._pq.push({ "x": 0, "y": 0 }, 1);
         this._pq.push({ "x": 0, "y": 2 }, 1);
         // Pop higher priority first.
-        var item0 = this._pq.pop();
-        var item1 = this._pq.pop();
+        let item0 = this._pq.pop();
+        let item1 = this._pq.pop();
         console.assert(item0["x"] === 3 && item1["x"] === 3);
         console.assert(item0["y"] === 0 || item1["y"] === 0);
         console.assert(item0["y"] === 1 || item1["y"] === 1);
         console.assert(this._pq.length === 4);
         // Pop lower priority next.
-        var item2 = this._pq.pop();
-        var item3 = this._pq.pop();
-        var item4 = this._pq.pop();
-        var item5 = this._pq.pop();
+        let item2 = this._pq.pop();
+        let item3 = this._pq.pop();
+        let item4 = this._pq.pop();
+        let item5 = this._pq.pop();
         console.assert(item2["x"] < 3);
         console.assert(item3["x"] < 3);
         console.assert(item4["x"] < 3);
         console.assert(item5["x"] < 3);
         console.assert(this._pq.length === 0);
         // None left to pop.
-        var item6 = this._pq.pop();
+        let item6 = this._pq.pop();
         console.assert(item6 === undefined);
-    };
-    TestPriorityQueue.prototype.test_popLow = function () {
+    }
+    test_popLow() {
         console.log("test_popLow");
         this._pq.push({ "x": 2, "y": 0 }, 2);
         this._pq.push({ "x": 2, "y": 1 }, 2);
@@ -543,62 +499,60 @@ var TestPriorityQueue = /** @class */ (function () {
         this._pq.push({ "x": 1, "y": 1 }, 1);
         this._pq.push({ "x": 3, "y": 0 }, 2);
         this._pq.push({ "x": 3, "y": 2 }, 2);
-        var item0 = this._pq.popLow();
-        var item1 = this._pq.popLow();
+        let item0 = this._pq.popLow();
+        let item1 = this._pq.popLow();
         console.assert(item0["x"] === 1 && item1["x"] === 1);
         console.assert(item0["y"] === 0 || item1["y"] === 0);
         console.assert(item0["y"] === 1 || item1["y"] === 1);
         console.assert(this._pq.length === 4);
-        var item2 = this._pq.popLow();
-        var item3 = this._pq.popLow();
-        var item4 = this._pq.popLow();
-        var item5 = this._pq.popLow();
+        let item2 = this._pq.popLow();
+        let item3 = this._pq.popLow();
+        let item4 = this._pq.popLow();
+        let item5 = this._pq.popLow();
         console.assert(item2["x"] > 1);
         console.assert(item3["x"] > 1);
         console.assert(item4["x"] > 1);
         console.assert(item5["x"] > 1);
         console.assert(this._pq.length === 0);
         // None left to pop.
-        var item6 = this._pq.pop();
+        let item6 = this._pq.pop();
         console.assert(item6 === undefined);
-    };
-    return TestPriorityQueue;
-}());
-var ProfileContainers = /** @class */ (function () {
-    function ProfileContainers() {
-        var _this = this;
-        var tests = [this.testTrivialStack, this.testTrivialQueue, this.testStack, this.testQueue];
-        tests.forEach(function (test) {
-            _this._init();
-            test.bind(_this)();
+    }
+}
+class ProfileContainers {
+    constructor() {
+        let tests = [this.testTrivialStack, this.testTrivialQueue, this.testStack, this.testQueue];
+        tests.forEach((test) => {
+            this._init();
+            test.bind(this)();
         }, this);
     }
-    ProfileContainers.prototype._init = function () {
-    };
-    ProfileContainers.prototype.manyPush = function (container) {
+    _init() {
+    }
+    manyPush(container) {
         console.assert(container.length === 0);
-        for (var i = 0; i < 100000; i++) {
+        for (let i = 0; i < 100000; i++) {
             container.push(i);
         }
         console.assert(container.length === 100000);
-    };
-    ProfileContainers.prototype.manyPushPop = function (container) {
+    }
+    manyPushPop(container) {
         console.assert(container.length === 0);
-        for (var i = 0; i < 100000; i++) {
+        for (let i = 0; i < 100000; i++) {
             container.push(i);
         }
         console.assert(container.length === 100000);
-        for (var i = 0; i < 100000 - 1; i++) {
+        for (let i = 0; i < 100000 - 1; i++) {
             container.pop();
         }
         console.assert(container.length === 1);
-        var val = container.pop();
+        let val = container.pop();
         console.assert(container.length === 0);
         console.assert(val === 0 || val === 100000 - 1);
-    };
-    ProfileContainers.prototype.testTrivialStack = function () {
+    }
+    testTrivialStack() {
         console.log("testTrivialStack");
-        var container = new TrivialStack();
+        let container = new TrivialStack();
         console.time("manyPush");
         this.manyPush(container);
         console.timeEnd("manyPush");
@@ -606,10 +560,10 @@ var ProfileContainers = /** @class */ (function () {
         console.time("manyPushPop");
         this.manyPushPop(container);
         console.timeEnd("manyPushPop");
-    };
-    ProfileContainers.prototype.testTrivialQueue = function () {
+    }
+    testTrivialQueue() {
         console.log("testTrivialQueue");
-        var container = new TrivialQueue();
+        let container = new TrivialQueue();
         console.time("manyPush");
         this.manyPush(container);
         console.timeEnd("manyPush");
@@ -617,10 +571,10 @@ var ProfileContainers = /** @class */ (function () {
         console.time("manyPushPop");
         this.manyPushPop(container);
         console.timeEnd("manyPushPop");
-    };
-    ProfileContainers.prototype.testStack = function () {
+    }
+    testStack() {
         console.log("testStack");
-        var container = new MyStack(1000000);
+        let container = new MyStack(1000000);
         console.time("manyPush");
         this.manyPush(container);
         console.timeEnd("manyPush");
@@ -628,10 +582,10 @@ var ProfileContainers = /** @class */ (function () {
         console.time("manyPushPop");
         this.manyPushPop(container);
         console.timeEnd("manyPushPop");
-    };
-    ProfileContainers.prototype.testQueue = function () {
+    }
+    testQueue() {
         console.log("testQueue");
-        var container = new MyQueue();
+        let container = new MyQueue();
         console.time("manyPush");
         this.manyPush(container);
         console.timeEnd("manyPush");
@@ -639,7 +593,6 @@ var ProfileContainers = /** @class */ (function () {
         console.time("manyPushPop");
         this.manyPushPop(container);
         console.timeEnd("manyPushPop");
-    };
-    return ProfileContainers;
-}());
+    }
+}
 //# sourceMappingURL=priorityQueue.js.map

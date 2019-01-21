@@ -66,8 +66,10 @@ function getRecursion(node: {"x", "y", "recursion"}): number {
 }
 
 /* Don't bother doing the square root of Pythagoras. Useful for comparing distances. */
-function cheapDist(a: Coord, b: Coord): number {
-  return Math.abs(a.x - b.x) * Math.abs(a.x - b.x) + Math.abs(a.y - b.y) * Math.abs(a.y - b.y);
+function distBetween(a: Coord, b: Coord): number {
+  //return Math.abs(a.x - b.x) * Math.abs(a.x - b.x) + Math.abs(a.y - b.y) * Math.abs(a.y - b.y);
+  return Math.round(1.5 * Math.sqrt((a.x - b.x) * (a.x - b.x) +
+                                  (a.y - b.y) * (a.y - b.y)));
 }
 
 class Star {
@@ -551,7 +553,7 @@ class Scenery {
   private readonly _mapSpacing: number = 1;
   private readonly _treeScale: number = 200;
   private readonly _treeSeedValue: number = 75;
-  private readonly _headroom: number = 1;
+  private readonly _headroom: number = 2;
 
   constructor(scene: BABYLON.Scene,
               shaddows: BABYLON.ShadowGenerator,
@@ -648,25 +650,25 @@ class Scenery {
       if(working.x > 0) {
         let node = {"x": working.x -1, "y": working.y, "recursion": this._maxRecursion};
         if(!visited[coordToKey(node)]) {
-          neighbours.push(node, cheapDist(working, coord));
+          neighbours.push(node, distBetween(working, coord));
         }
       }
       if(working.x < this._mapSize -1) {
         let node = {"x": working.x +1, "y": working.y, "recursion": this._maxRecursion};
         if(!visited[coordToKey(node)]) {
-          neighbours.push(node, cheapDist(working, coord));
+          neighbours.push(node, distBetween(working, coord));
         }
       }
       if(working.y > 0) {
         let node = {"x": working.x, "y": working.y -1, "recursion": this._maxRecursion};
         if(!visited[coordToKey(node)]) {
-          neighbours.push(node, cheapDist(working, coord));
+          neighbours.push(node, distBetween(working, coord));
         }
       }
       if(working.y < this._mapSize -1) {
         let node = {"x": working.x, "y": working.y +1, "recursion": this._maxRecursion};
         if(!visited[coordToKey(node)]) {
-          neighbours.push(node, cheapDist(working, coord));
+          neighbours.push(node, distBetween(working, coord));
         }
       }
     }
@@ -723,7 +725,7 @@ class Scenery {
            (a.minHeight > this._headroom || a.minHeight === undefined)) {
           if(a.pathScore === undefined) {
             a.pathScore = working.pathScore + 1;
-            neighbours.push(a, working.pathScore + 1 + cheapDist(a, startAdjusted));
+            neighbours.push(a, a.pathScore + distBetween(a, startAdjusted));
           } else {
             a.pathScore = Math.min(a.pathScore, working.pathScore + 1);
           }
@@ -731,23 +733,33 @@ class Scenery {
       });
     }
 
-    for(let y = 0; y < 50; y++) {
+    /*for(let y = 0; y < this._mapSize; y++) {
       let line = "";
-      for(let x = 0; x < 30; x++) {
+      for(let x = 0; x < this._mapSize; x++) {
         let node = this.getCell({x, y, "recursion": this._maxRecursion});
         let val = "" + node.pathScore;
         if(val === "undefined") {
-          val = ".";
-          if(this.getCell(node).minHeight <= 10) {
+          val = " ";
+          if(this.getCell(node).minHeight <= this._headroom) {
             val = "#";
           }
+        } else {
+          val = ".";
+          let pathNode = BABYLON.MeshBuilder.CreateSphere("path_" + x + "_" + y, {}, this._scene);
+          pathNode.position.x = this.mapToWorld(node).x;
+          pathNode.position.y = 0;
+          pathNode.position.z = this.mapToWorld(node).y;
         }
         if(x === start.x && y === start.y) { val = "*"; }
         if(x === startAdjusted.x && y === startAdjusted.y) { val = "(*)"; }
-        line += "\t" + val;
+        if(y < 50 && x < 150) {
+          line += val;
+        }
       }
-      console.log(line);
-    }
+      if(y < 50) {
+        console.log(line);
+      }
+    }*/
     console.timeEnd("calculatePath");
     console.log("Sucessfull: ", reachedDestination);
     return reachedDestination;
@@ -832,14 +844,15 @@ class Scenery {
           let xMax = (leaves.maximumWorld.x / this._mapSpacing) * scale;
           let yMin = (leaves.minimumWorld.z / this._mapSpacing) * scale;
           let yMax = (leaves.maximumWorld.z / this._mapSpacing) * scale;
-          for(let xx = Math.ceil(xMin + jitterX); xx <= Math.floor(xMax + jitterX); xx++) {
-            for(let yy = Math.ceil(yMin + jitterY); yy <= Math.floor(yMax + jitterY); yy++) {
+          //for(let xx = Math.ceil(xMin + jitterX); xx <= Math.floor(xMax + jitterX); xx++) {
+          for(let xx = Math.floor(xMin + jitterX); xx <= Math.ceil(xMax + jitterX); xx++) {
+            //for(let yy = Math.ceil(yMin + jitterY); yy <= Math.floor(yMax + jitterY); yy++) {
+            for(let yy = Math.floor(yMin + jitterY); yy <= Math.ceil(yMax + jitterY); yy++) {
               let c = this.getCell({x: xx + x, y: yy + y, recursion: this._maxRecursion});
               if(c && (c.maxHeight === undefined || c.maxHeight < leavesTop)) {
                 c.maxHeight = leavesTop;
               }
-              if(c && (c.minHeight === undefined || c.minHeight > leavesBottom) &&
-                (xx * xx + yy * yy) < (Math.floor(xMax) * Math.floor(xMax))) {
+              if(c && (c.minHeight > leavesBottom || c.minHeight === undefined)) {
                 c.minHeight = leavesBottom;
               }
             }
@@ -873,16 +886,17 @@ class Scenery {
           // console.log(xMin, xMax, yMin, yMax);
           /*let testTreetop = BABYLON.MeshBuilder.CreateBox("test",
             {"width": (xMax - xMin) * this._mapSpacing,
-             "height": leavesTop,
+             "height": leavesTop - leavesBottom,
              "depth": (yMax - yMin) * this._mapSpacing},
             this._scene);
           var material = new BABYLON.StandardMaterial("myMaterial", this._scene);
           material.diffuseColor = new BABYLON.Color3(1, 0, 0);
-          material.wireframe = true;
+          //material.wireframe = true;
+          material.alpha = 0.5;
           testTreetop.material = material;
-          testTreetop.position.x = (x - this._mapSize / 2) * this._mapSpacing;
-          testTreetop.position.y = leavesTop / 2;
-          testTreetop.position.z = (y - this._mapSize / 2) * this._mapSpacing;*/
+          testTreetop.position.x = (x + jitterX - this._mapSize / 2) * this._mapSpacing;
+          testTreetop.position.y = (leavesTop + leavesBottom) / 2;
+          testTreetop.position.z = (y + jitterY - this._mapSize / 2) * this._mapSpacing;*/
 
           this._applyGroundCover((x - this._mapSize / 2) * this._mapSpacing,
             (y - this._mapSize / 2) * this._mapSpacing);
@@ -918,6 +932,26 @@ class Scenery {
     this._consolidateTrees(trees);
   }
 
+  worldToMap(coord: Coord) : Coord {
+    let x = Math.round(coord.x / this._mapSpacing + this._mapSize / 2);
+    let y = Math.round(coord.y / this._mapSpacing + this._mapSize / 2);
+    let recursion = coord.recursion;
+    if(recursion === undefined) {
+      recursion = this._maxRecursion;
+    }
+    return {x, y, recursion};
+  }
+
+  mapToWorld(coord: Coord) : Coord {
+    let x = Math.round(coord.x * this._mapSpacing - this._mapSize / 2);
+    let y = Math.round(coord.y * this._mapSpacing - this._mapSize / 2);
+    let recursion = coord.recursion;
+    if(recursion === undefined) {
+      recursion = this._maxRecursion;
+    }
+    return {x, y, recursion};
+  }
+
   setCell(coord: Coord, vegitation: number) : void {
     let cell = new SceneryCell(coord, vegitation);
     this._cells.put(cell, cell);
@@ -939,15 +973,8 @@ class Scenery {
   }
 
   getCellWorld(coord: Coord) : SceneryCell {
-    let x = Math.round(coord.x / this._mapSpacing + this._mapSize / 2);
-    let y = Math.round(coord.y / this._mapSpacing + this._mapSize / 2);
-    let recursion = coord.recursion;
-    if(recursion === undefined) {
-      recursion = this._maxRecursion;
-    }
-    return this.getCell({x, y, recursion});
+    return this.getCell(this.worldToMap(coord));
   }
-  
 
   getCellParent(coord: Coord) : SceneryCell {
     let cell = this.getCell(coord);
@@ -1192,6 +1219,7 @@ class Camera {
   private _scene: BABYLON.Scene;
   private _cameraArc: BABYLON.ArcRotateCamera;
   private _cameraUniversal: BABYLON.UniversalCamera;
+  private _cameraFollow:BABYLON.FollowCamera;
   //private _selectedActor: 0;
   private _target: BABYLON.Mesh;
   
@@ -1223,6 +1251,19 @@ class Camera {
       "UniversalCamera", new BABYLON.Vector3(0, 0, -10), this._scene);
     this._cameraUniversal.setTarget(this._target.position);
     this.cameras.push({"name": "Universal", "camera": this._cameraUniversal});
+
+    this._cameraFollow = new BABYLON.FollowCamera(
+      "FollowCamera", new BABYLON.Vector3(0, 1, -10), this._scene);
+    this._cameraFollow.radius = 10;
+    this._cameraFollow.heightOffset = 1;
+    this._cameraFollow.rotationOffset = 180 / 4;
+    this._cameraFollow.cameraAcceleration = 0.02;
+    this._cameraFollow.maxCameraSpeed = 20;
+    this._cameraFollow.attachControl(this._canvas, true);
+    this._cameraFollow.lockedTarget = this._target;
+    //this._cameraFollow.lowerRadiusLimit = 3;
+    //this._cameraFollow.lowerHeightOffsetLimit = 1;
+    this.cameras.push({"name": "Follow", "camera": this._cameraFollow});
     
     this._scene.onBeforeRenderObservable.add(() => {
       if(this._cameraArc.getTarget() != this._target.position) {
@@ -1267,20 +1308,29 @@ class Camera {
       this._target.position = this._cameraUniversal.getFrontPosition(distance);
       this.setTarget(new BABYLON.Vector3(0, 0, 0));
     }
+    this._cameraArc.detachControl(this._canvas);
+    this._cameraUniversal.detachControl(this._canvas);
+    this._cameraFollow.detachControl(this._canvas);
 
     // Set the new camera.
     if(camera.name === "ArcRotate") {
-      this._cameraArc.setPosition(this._cameraUniversal.position);
+      this._cameraArc.setPosition(this._scene.activeCamera.position);
       this._cameraArc.rebuildAnglesAndRadius();
-      this._cameraUniversal.detachControl(this._canvas);
       this._cameraArc.attachControl(this._canvas, true, false);
       this._scene.activeCamera = this._cameraArc;
-    } else {
-      this._cameraArc.detachControl(this._canvas);
+    } else if(camera.name === "Universal") {
       this._cameraUniversal.attachControl(this._canvas, true);
-      this._cameraUniversal.position = this._cameraArc.position;
-      this._cameraUniversal.setTarget(this._cameraArc.getTarget());
+      this._cameraUniversal.position = this._scene.activeCamera.position;
+      this._cameraUniversal.setTarget(this._target.position);
       this._scene.activeCamera = this._cameraUniversal;
+    } else if(camera.name === "Follow") {
+      this._cameraFollow.position = this._scene.activeCamera.position;
+      this._scene.activeCamera = this._cameraFollow;
+      
+      this._cameraFollow.inputs.attachInput(
+        this._cameraFollow.inputs.attached.FollowCameraControls);
+      this._cameraFollow.attachControl(this._canvas, true);
+      console.log(this._cameraFollow.inputs);
     }
   }
 }

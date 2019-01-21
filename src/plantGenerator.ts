@@ -202,8 +202,8 @@ function QuickShrub(sizeBranch: number,
     leaves.convertToFlatShadedMesh();
     
     leaves.material = leafMaterial;
-    leaves.scaling.y = randomNumber(0.1, 1);
-    leaves.position.y = leaves.scaling.y * sizeBranch/2 ;
+    leaves.scaling.y = randomNumber(0.2, 1);
+    leaves.position.y = 0.1 + leaves.scaling.y * sizeBranch/2 ;
     
     leaves.parent = tree;
     return tree;
