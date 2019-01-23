@@ -1,39 +1,16 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <meta http-equiv="Content-Type" content="text/html" charset="utf-8"/>
-
     <title>Fox out for a walk.</title>
+    <link rel="stylesheet" type="text/css" href="index.css">
     <script src="https://preview.babylonjs.com/babylon.js"></script>
     <script src="https://preview.babylonjs.com/gui/babylon.gui.min.js"></script>
     <script src="plantGenerator.js"></script>
     <script src="priorityQueue.js"></script>
     <script src="game.js"></script>
-    <style>
-      html, body {
-        overflow: hidden;
-          width   : 100%;
-          height  : 100%;
-          margin  : 0;
-          padding : 0;
-      }
-      #renderCanvas {
-        width   : 100%;
-        height  : 100%;
-        touch-action: none;
-      }
-      #fpsLabel {
-        position: absolute;
-        right: 20px;
-        top: 20px;
-        color: #999;
-        background-color: #222;
-        cursor: default;
-      }
-    </style>
   </head>
   <body>
     <canvas id="renderCanvas"></canvas>
-    <div id="fpsLabel"></>
+    <div id="fpsLabel"></div>
   </body>
 </html>

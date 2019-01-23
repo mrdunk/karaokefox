@@ -595,4 +595,5 @@ class ProfileContainers {
         console.timeEnd("manyPushPop");
     }
 }
+
 //# sourceMappingURL=priorityQueue.js.map

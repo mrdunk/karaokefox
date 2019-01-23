@@ -1223,4 +1223,5 @@ window.addEventListener('DOMContentLoaded', () => {
     // Start render loop.
     game.doRender();
 });
+
 //# sourceMappingURL=game.js.map

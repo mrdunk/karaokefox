@@ -162,4 +162,5 @@ function QuickShrub(sizeBranch, leafMaterial, scene) {
     leaves.parent = tree;
     return tree;
 }
+
 //# sourceMappingURL=plantGenerator.js.map
