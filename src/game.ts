@@ -505,20 +505,20 @@ class Character {
   }
 }
 
-class SceneryCell implements Coord {
+class MapCell implements Coord {
   x: number;
   y: number;
   recursion: number;
-  vegitation: number;
+  vegetation: number;
   maxHeight: number;
   minHeight: number;
   pathScore: number;
 
-  constructor(coord: Coord, vegitation: number) {
+  constructor(coord: Coord, vegetation: number) {
     this.x = coord.x;
     this.y = coord.y;
     this.recursion = coord.recursion;
-    this.vegitation = vegitation;
+    this.vegetation = vegetation;
   }
 
   parentCoordinates(depth: number) : Coord {
@@ -546,7 +546,7 @@ class Scenery {
   private _mapSize: number;
   private _maxRecursion: number;
   private _treeRecursion: number;
-  private _cells: MyMap<Coord, SceneryCell>;
+  private _cells: MyMap<Coord, MapCell>;
   private _treeTypes: BABYLON.Mesh[];
   private _shrubTypes: BABYLON.Mesh[];
   private _groundCoverTypes: BABYLON.StandardMaterial[];
@@ -575,8 +575,16 @@ class Scenery {
     console.assert(Math.pow(2, this._maxRecursion) === this._mapSize &&
                    Boolean("Map size is not a power of 2."));
 
-    this._cells = new MyMap<Coord, SceneryCell>(getX, getY, getRecursion);
+    this._cells = new MyMap<Coord, MapCell>(getX, getY, getRecursion);
 
+    this._setVegetationHeights();
+    this._plantTrees();
+
+    //this._shaddows.getShadowMap().renderList.push(this._trees);
+  }
+
+  // Assign "vegetation" values to map cells which dictates how large plants are.
+  private _setVegetationHeights() {
     for (let recursion = 0; recursion <= this._maxRecursion; recursion++) {
       let tileSize = Math.pow(2, this._maxRecursion - recursion);
       // console.log(tileSize, recursion);
@@ -608,31 +616,17 @@ class Scenery {
                 seededRandom(500, 1000, seed + "_2"),
                 seededRandom(500, 1000, seed + "_3")];
               let childModTotal = childMod.reduce((total, num) => { return total + num; });
-              childMod.forEach((vegitation, index, array) => { array[index] /= childModTotal; });
+              childMod.forEach((vegetation, index, array) => { array[index] /= childModTotal; });
               let childIndex = ((x - parentCell.x) + 2 * (y - parentCell.y)) / tileSize;
 
-              //this.setCell({x, y, recursion},
-                //parentCell.vegitation * (0.5 + Math.random()));
               this.setCell({x, y, recursion},
-                parentCell.vegitation * childMod[childIndex] * 4);
+                parentCell.vegetation * childMod[childIndex] * 4);
             }
           }
         }
       }
     }
     console.log("Cell count: ", this._cells.length);
-
-    /*for (let x = 0; x < this._mapSize; x++) {
-      let line = "";
-      for (let y = 0; y < this._mapSize; y++) {
-        line += " " + Math.round(this.getCell({x, y, recursion: this._maxRecursion}).vegitation);
-      }
-      console.log(line);
-    }*/
-
-    this._plantTrees();
-
-    //this._shaddows.getShadowMap().renderList.push(this._trees);
   }
 
   private _findClosestSpace(coord: Coord, height: number): Coord {
@@ -693,19 +687,19 @@ class Scenery {
 
     destinationAdjusted.pathScore = 0;
 
-    let neighbours: PriorityQueue<SceneryCell> =
-      new PriorityQueue<SceneryCell>(getX, getY);
+    let neighbours: PriorityQueue<MapCell> =
+      new PriorityQueue<MapCell>(getX, getY);
     neighbours.push(destinationAdjusted, 0);
 
     while (neighbours.length) {
-      let working: SceneryCell = neighbours.popLow();
+      let working: MapCell = neighbours.popLow();
 
       if (working.x === startAdjusted.x && working.y === startAdjusted.y) {
         reachedDestination = true;
         break;
       }
 
-      let adjacent: SceneryCell[] = new Array(4);
+      let adjacent: MapCell[] = new Array(4);
       if (working.x > 0) {
         adjacent[0] = this.getCell(
           {"x": working.x - 1, "y": working.y, "recursion": this._maxRecursion});
@@ -769,6 +763,9 @@ class Scenery {
 
   private _plantTrees() : void {
     console.log("Planting trees.");
+
+    let treeFactory = new TreeFactory(this._scene, 10, 8);
+
     this._treeTypes = [];
     this._treeSpecies = 0;
     // Ensure there are always /some/ of each type of tree.
@@ -813,14 +810,14 @@ class Scenery {
     for (let x = 0; x < this._mapSize; x += tileSize) {
       for (let y = 0; y < this._mapSize; y += tileSize) {
         let cell = this.getCell({x, y, recursion: this._treeRecursion});
-        let scale = cell.vegitation / this._treeScale;
+        let scale = cell.vegetation / this._treeScale;
         let tree: BABYLON.Mesh;
-        if (cell.vegitation > 80) {
+        if (cell.vegetation > 80) {
           let treeTypeIndex = Math.round(Math.random() * (this._treeTypes.length - 1));
           //console.log(treeTypeIndex, this._treeTypes.length);
           tree = this._treeTypes[treeTypeIndex].clone(
             this._treeTypes[treeTypeIndex].name + "_" + x + "_" + y);
-        } else if (cell.vegitation > 50) {
+        } else if (cell.vegetation > 50) {
           let shrubTypes = this._shrubTypes.length;
           let shrubTypeIndex = Math.round(Math.random() * (this._shrubTypes.length - 1));
           tree = this._shrubTypes[shrubTypeIndex].clone(
@@ -954,12 +951,12 @@ class Scenery {
     return {x, y, recursion};
   }
 
-  setCell(coord: Coord, vegitation: number) : void {
-    let cell = new SceneryCell(coord, vegitation);
+  setCell(coord: Coord, vegetation: number) : void {
+    let cell = new MapCell(coord, vegetation);
     this._cells.put(cell, cell);
   }
 
-  getCell(coord: Coord) : SceneryCell {
+  getCell(coord: Coord) : MapCell {
     if (coord.recursion === - 1) {
       return this._cells.get({"x": 0, "y": 0, "recursion": 0});
     }
@@ -974,14 +971,14 @@ class Scenery {
     return cell.maxHeight;
   }
 
-  getCellWorld(coord: Coord) : SceneryCell {
+  getCellWorld(coord: Coord) : MapCell {
     return this.getCell(this.worldToMap(coord));
   }
 
-  getCellParent(coord: Coord) : SceneryCell {
+  getCellParent(coord: Coord) : MapCell {
     let cell = this.getCell(coord);
     if (cell === undefined) {
-      return this.getCell(new SceneryCell(coord, - 1).parentCoordinates(this._maxRecursion));
+      return this.getCell(new MapCell(coord, - 1).parentCoordinates(this._maxRecursion));
     }
     return this.getCell(cell.parentCoordinates(this._maxRecursion));
   }

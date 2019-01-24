@@ -1,3 +1,142 @@
+interface PlantSpecies {
+  generator: () => BABYLON.Mesh;  // Method to generate Mesh.
+  minTypes: number;               // Must be at least this many types.
+  weight: number;                 // How prolific this species is.
+}
+
+class TreeFactory {
+  public trees: BABYLON.Mesh[];
+  public shrubs: BABYLON.Mesh[];
+  public treeTypes: number;
+  public shrubTypes: number;
+  private _scene: BABYLON.Scene;
+  private treeSpecies: PlantSpecies[];
+  private shrubSpecies: PlantSpecies[];
+
+  constructor(scene: BABYLON.Scene, treeTypes: number, shrubTypes: number) {
+    this._scene = scene;
+    this.treeTypes = treeTypes;
+    this.shrubTypes = shrubTypes;
+
+    this.trees = [];
+    this.shrubs = [];
+    this.treeSpecies = [];
+    this.shrubSpecies = [];
+
+    this.treeSpecies.push({generator: this._createPine, minTypes: 2, weight: 0.2});
+    this.treeSpecies.push({generator: this._createLollypop, minTypes: 2, weight: 0.8});
+    this.shrubSpecies.push({generator: this._createBush, minTypes: 2, weight: 0.6});
+    this.shrubSpecies.push({generator: this._createPine, minTypes: 2, weight: 0.2});
+    this.shrubSpecies.push({generator: this._createLollypop, minTypes: 2, weight: 0.2});
+
+    // Populate at least the minTypes of each species.
+    this.treeSpecies.forEach((genius) => {
+      for (let i = 0; i < genius.minTypes; i++) {
+        this._createTree(genius.generator);
+      }
+    }, this);
+
+    this.shrubSpecies.forEach((genius) => {
+      for (let i = 0; i < genius.minTypes; i++) {
+        this._createShrub(genius.generator);
+      }
+    }, this);
+
+    // Populate remainder.
+    for (let i = this.trees.length; i < this.treeTypes; i++) {
+      this._createTree();
+    }
+
+    for (let i = this.shrubs.length; i < this.shrubTypes; i++) {
+      this._createShrub();
+    }
+  }
+
+  private _createTree(hint?: () => BABYLON.Mesh): void {
+    if (!hint) {
+      let rnd = Math.random();
+      let totalWeight = 0;
+      this.treeSpecies.forEach((genius) => {
+        if (rnd >= totalWeight && rnd < totalWeight + genius.weight) {
+          hint = genius.generator;
+        }
+        totalWeight += genius.weight;
+      }, this);
+    }
+
+    let tree = (hint.bind(this))();
+    tree.name = "tree_" + tree.name + "_" + this.trees.length;
+    this.trees.push(tree);
+    console.log(tree.name);
+  }
+
+  private _createShrub(hint?: () => BABYLON.Mesh): void {
+    if (!hint) {
+      let rnd = Math.random();
+      let totalWeight = 0;
+      this.shrubSpecies.forEach((genius) => {
+        if (rnd >= totalWeight && rnd < totalWeight + genius.weight) {
+          hint = genius.generator;
+        }
+        totalWeight += genius.weight;
+      }, this);
+    }
+
+    let shrub = (hint.bind(this))();
+    shrub.name = "shrub_" + shrub.name + "_" + this.shrubs.length;
+    this.shrubs.push(shrub);
+    console.log(shrub.name);
+  }
+
+  private _createPine(): BABYLON.Mesh {
+    let canopies = Math.round(Math.random() * 3) + 4;
+    let height = Math.round(Math.random() * 20) + 20;
+    let width = 5;
+
+    let tree = PineGenerator(
+      canopies, height, width, this.materialBark(), this.materialLeaves(), this._scene);
+    tree.setEnabled(false);
+    return tree;
+  }
+
+  private _createLollypop(): BABYLON.Mesh {
+    let sizeBranch = 15 + Math.random() * 5;
+    let sizeTrunk = 10 + Math.random() * 5;
+    let radius = 1 + Math.random() * 4;
+
+    let tree = QuickTreeGenerator(
+      sizeBranch, sizeTrunk, radius, this.materialBark(), this.materialLeaves(), this._scene);
+    tree.setEnabled(false);
+    return tree;
+  }
+
+  private _createBush(): BABYLON.Mesh {
+    let sizeBranch = 10 + Math.random() * 20;
+
+    let tree = QuickShrub(sizeBranch, this.materialLeaves(), this._scene);
+    tree.setEnabled(false);
+    return tree;
+  }
+
+  private materialBark(): BABYLON.StandardMaterial {
+    let material = new BABYLON.StandardMaterial("bark", this._scene);
+    material.diffuseColor = new BABYLON.Color3(0.3 + Math.random() * 0.2,
+                                               0.2 + Math.random() * 0.2,
+                                               0.2 + Math.random() * 0.1);
+    material.specularColor = BABYLON.Color3.Black();
+    return material;
+  }
+
+  private materialLeaves(): BABYLON.StandardMaterial {
+    let material = new BABYLON.StandardMaterial("leaves", this._scene);
+    material.diffuseColor = new BABYLON.Color3(0.4 + Math.random() * 0.2,
+                                               0.5 + Math.random() * 0.4,
+                                               0.2 + Math.random() * 0.2);
+    material.specularColor = BABYLON.Color3.Red();
+    return material;
+  }
+}
+
 //canopies number of leaf sections, height of tree, materials
 // https://www.babylonjs-playground.com/#LG3GS#93
 // https://github.com/BabylonJS/Extensions/tree/master/TreeGenerators/SimplePineGenerator

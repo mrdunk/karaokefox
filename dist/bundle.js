@@ -351,12 +351,12 @@ class Character {
         animateRequest.runCount++;
     }
 }
-class SceneryCell {
-    constructor(coord, vegitation) {
+class MapCell {
+    constructor(coord, vegetation) {
         this.x = coord.x;
         this.y = coord.y;
         this.recursion = coord.recursion;
-        this.vegitation = vegitation;
+        this.vegetation = vegetation;
     }
     parentCoordinates(depth) {
         let pX = 0;
@@ -392,6 +392,12 @@ class Scenery {
         console.assert(Math.pow(2, this._maxRecursion) === this._mapSize &&
             Boolean("Map size is not a power of 2."));
         this._cells = new MyMap(getX, getY, getRecursion);
+        this._setVegetationHeights();
+        this._plantTrees();
+        //this._shaddows.getShadowMap().renderList.push(this._trees);
+    }
+    // Assign "vegetation" values to map cells which dictates how large plants are.
+    _setVegetationHeights() {
         for (let recursion = 0; recursion <= this._maxRecursion; recursion++) {
             let tileSize = Math.pow(2, this._maxRecursion - recursion);
             // console.log(tileSize, recursion);
@@ -428,26 +434,15 @@ class Scenery {
                                 seededRandom(500, 1000, seed + "_3")
                             ];
                             let childModTotal = childMod.reduce((total, num) => { return total + num; });
-                            childMod.forEach((vegitation, index, array) => { array[index] /= childModTotal; });
+                            childMod.forEach((vegetation, index, array) => { array[index] /= childModTotal; });
                             let childIndex = ((x - parentCell.x) + 2 * (y - parentCell.y)) / tileSize;
-                            //this.setCell({x, y, recursion},
-                            //parentCell.vegitation * (0.5 + Math.random()));
-                            this.setCell({ x, y, recursion }, parentCell.vegitation * childMod[childIndex] * 4);
+                            this.setCell({ x, y, recursion }, parentCell.vegetation * childMod[childIndex] * 4);
                         }
                     }
                 }
             }
         }
         console.log("Cell count: ", this._cells.length);
-        /*for (let x = 0; x < this._mapSize; x++) {
-          let line = "";
-          for (let y = 0; y < this._mapSize; y++) {
-            line += " " + Math.round(this.getCell({x, y, recursion: this._maxRecursion}).vegitation);
-          }
-          console.log(line);
-        }*/
-        this._plantTrees();
-        //this._shaddows.getShadowMap().renderList.push(this._trees);
     }
     _findClosestSpace(coord, height) {
         let neighbours = new PriorityQueue(getX, getY);
@@ -565,6 +560,7 @@ class Scenery {
     }
     _plantTrees() {
         console.log("Planting trees.");
+        let treeFactory = new TreeFactory(this._scene, 10, 8);
         this._treeTypes = [];
         this._treeSpecies = 0;
         // Ensure there are always /some/ of each type of tree.
@@ -606,14 +602,14 @@ class Scenery {
         for (let x = 0; x < this._mapSize; x += tileSize) {
             for (let y = 0; y < this._mapSize; y += tileSize) {
                 let cell = this.getCell({ x, y, recursion: this._treeRecursion });
-                let scale = cell.vegitation / this._treeScale;
+                let scale = cell.vegetation / this._treeScale;
                 let tree;
-                if (cell.vegitation > 80) {
+                if (cell.vegetation > 80) {
                     let treeTypeIndex = Math.round(Math.random() * (this._treeTypes.length - 1));
                     //console.log(treeTypeIndex, this._treeTypes.length);
                     tree = this._treeTypes[treeTypeIndex].clone(this._treeTypes[treeTypeIndex].name + "_" + x + "_" + y);
                 }
-                else if (cell.vegitation > 50) {
+                else if (cell.vegetation > 50) {
                     let shrubTypes = this._shrubTypes.length;
                     let shrubTypeIndex = Math.round(Math.random() * (this._shrubTypes.length - 1));
                     tree = this._shrubTypes[shrubTypeIndex].clone(this._shrubTypes[shrubTypeIndex].name + "_" + x + "_" + y);
@@ -732,8 +728,8 @@ class Scenery {
         }
         return { x, y, recursion };
     }
-    setCell(coord, vegitation) {
-        let cell = new SceneryCell(coord, vegitation);
+    setCell(coord, vegetation) {
+        let cell = new MapCell(coord, vegetation);
         this._cells.put(cell, cell);
     }
     getCell(coord) {
@@ -755,7 +751,7 @@ class Scenery {
     getCellParent(coord) {
         let cell = this.getCell(coord);
         if (cell === undefined) {
-            return this.getCell(new SceneryCell(coord, -1).parentCoordinates(this._maxRecursion));
+            return this.getCell(new MapCell(coord, -1).parentCoordinates(this._maxRecursion));
         }
         return this.getCell(cell.parentCoordinates(this._maxRecursion));
     }
@@ -1226,6 +1222,106 @@ window.addEventListener('DOMContentLoaded', () => {
 });
 
 },{}],2:[function(require,module,exports){
+class TreeFactory {
+    constructor(scene, treeTypes, shrubTypes) {
+        this._scene = scene;
+        this.treeTypes = treeTypes;
+        this.shrubTypes = shrubTypes;
+        this.trees = [];
+        this.shrubs = [];
+        this.treeSpecies = [];
+        this.shrubSpecies = [];
+        this.treeSpecies.push({ generator: this._createPine, minTypes: 2, weight: 0.2 });
+        this.treeSpecies.push({ generator: this._createLollypop, minTypes: 2, weight: 0.8 });
+        this.shrubSpecies.push({ generator: this._createBush, minTypes: 2, weight: 0.6 });
+        this.shrubSpecies.push({ generator: this._createPine, minTypes: 2, weight: 0.2 });
+        this.shrubSpecies.push({ generator: this._createLollypop, minTypes: 2, weight: 0.2 });
+        // Populate at least the minTypes of each species.
+        this.treeSpecies.forEach((genius) => {
+            for (let i = 0; i < genius.minTypes; i++) {
+                this._createTree(genius.generator);
+            }
+        }, this);
+        this.shrubSpecies.forEach((genius) => {
+            for (let i = 0; i < genius.minTypes; i++) {
+                this._createShrub(genius.generator);
+            }
+        }, this);
+        // Populate remainder.
+        for (let i = this.trees.length; i < this.treeTypes; i++) {
+            this._createTree();
+        }
+        for (let i = this.shrubs.length; i < this.shrubTypes; i++) {
+            this._createShrub();
+        }
+    }
+    _createTree(hint) {
+        if (!hint) {
+            let rnd = Math.random();
+            let totalWeight = 0;
+            this.treeSpecies.forEach((genius) => {
+                if (rnd >= totalWeight && rnd < totalWeight + genius.weight) {
+                    hint = genius.generator;
+                }
+                totalWeight += genius.weight;
+            }, this);
+        }
+        let tree = (hint.bind(this))();
+        tree.name = "tree_" + tree.name + "_" + this.trees.length;
+        this.trees.push(tree);
+        console.log(tree.name);
+    }
+    _createShrub(hint) {
+        if (!hint) {
+            let rnd = Math.random();
+            let totalWeight = 0;
+            this.shrubSpecies.forEach((genius) => {
+                if (rnd >= totalWeight && rnd < totalWeight + genius.weight) {
+                    hint = genius.generator;
+                }
+                totalWeight += genius.weight;
+            }, this);
+        }
+        let shrub = (hint.bind(this))();
+        shrub.name = "shrub_" + shrub.name + "_" + this.shrubs.length;
+        this.shrubs.push(shrub);
+        console.log(shrub.name);
+    }
+    _createPine() {
+        let canopies = Math.round(Math.random() * 3) + 4;
+        let height = Math.round(Math.random() * 20) + 20;
+        let width = 5;
+        let tree = PineGenerator(canopies, height, width, this.materialBark(), this.materialLeaves(), this._scene);
+        tree.setEnabled(false);
+        return tree;
+    }
+    _createLollypop() {
+        let sizeBranch = 15 + Math.random() * 5;
+        let sizeTrunk = 10 + Math.random() * 5;
+        let radius = 1 + Math.random() * 4;
+        let tree = QuickTreeGenerator(sizeBranch, sizeTrunk, radius, this.materialBark(), this.materialLeaves(), this._scene);
+        tree.setEnabled(false);
+        return tree;
+    }
+    _createBush() {
+        let sizeBranch = 10 + Math.random() * 20;
+        let tree = QuickShrub(sizeBranch, this.materialLeaves(), this._scene);
+        tree.setEnabled(false);
+        return tree;
+    }
+    materialBark() {
+        let material = new BABYLON.StandardMaterial("bark", this._scene);
+        material.diffuseColor = new BABYLON.Color3(0.3 + Math.random() * 0.2, 0.2 + Math.random() * 0.2, 0.2 + Math.random() * 0.1);
+        material.specularColor = BABYLON.Color3.Black();
+        return material;
+    }
+    materialLeaves() {
+        let material = new BABYLON.StandardMaterial("leaves", this._scene);
+        material.diffuseColor = new BABYLON.Color3(0.4 + Math.random() * 0.2, 0.5 + Math.random() * 0.4, 0.2 + Math.random() * 0.2);
+        material.specularColor = BABYLON.Color3.Red();
+        return material;
+    }
+}
 //canopies number of leaf sections, height of tree, materials
 // https://www.babylonjs-playground.com/#LG3GS#93
 // https://github.com/BabylonJS/Extensions/tree/master/TreeGenerators/SimplePineGenerator
