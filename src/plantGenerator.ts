@@ -4,7 +4,7 @@ interface PlantSpecies {
   weight: number;                 // How prolific this species is.
 }
 
-class TreeFactory {
+class Nursery {
   public trees: BABYLON.Mesh[];
   public shrubs: BABYLON.Mesh[];
   public treeTypes: number;
@@ -50,6 +50,23 @@ class TreeFactory {
     for (let i = this.shrubs.length; i < this.shrubTypes; i++) {
       this._createShrub();
     }
+  }
+
+  public dispose(): void {
+    this.trees.forEach((tree) => { tree.dispose(); });
+    this.shrubs.forEach((shrub) => { shrub.dispose(); });
+  }
+
+  public getTree(x: number, y: number): BABYLON.Mesh {
+    let treeTypeIndex = Math.round(Math.random() * (this.trees.length - 1));
+    let species = this.trees[treeTypeIndex];
+    return species.clone(species.name + "_" + x + "_" + y);
+  }
+
+  public getShrub(x: number, y: number): BABYLON.Mesh {
+    let shrubTypeIndex = Math.round(Math.random() * (this.shrubs.length - 1));
+    let species = this.shrubs[shrubTypeIndex];
+    return species.clone(species.name + "_" + x + "_" + y);
   }
 
   private _createTree(hint?: () => BABYLON.Mesh): void {

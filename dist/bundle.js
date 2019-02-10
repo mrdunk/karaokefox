@@ -560,34 +560,7 @@ class Scenery {
     }
     _plantTrees() {
         console.log("Planting trees.");
-        let treeFactory = new TreeFactory(this._scene, 10, 8);
-        this._treeTypes = [];
-        this._treeSpecies = 0;
-        // Ensure there are always /some/ of each type of tree.
-        this._treeTypes.push(this._createTreePine());
-        this._treeTypes.push(this._createTreeDeciduous());
-        // But most should be random.
-        this._treeTypes.push(this._createTree());
-        this._treeTypes.push(this._createTree());
-        this._treeTypes.push(this._createTree());
-        this._treeTypes.push(this._createTree());
-        this._treeTypes.push(this._createTree());
-        this._treeTypes.push(this._createTree());
-        this._treeTypes.push(this._createTree());
-        this._treeTypes.push(this._createTree());
-        this._treeTypes.push(this._createTree());
-        this._treeTypes.push(this._createTree());
-        this._shrubTypes = [];
-        this._shrubTypes.push(this._createShrub(true));
-        this._shrubTypes.push(this._createShrub());
-        this._shrubTypes.push(this._createShrub());
-        this._shrubTypes.push(this._createShrub());
-        this._shrubTypes.push(this._createShrub());
-        this._shrubTypes.push(this._createShrub());
-        this._shrubTypes.push(this._createShrub());
-        this._shrubTypes.push(this._createShrub());
-        this._shrubTypes.push(this._createShrub());
-        this._shrubTypes.push(this._createShrub());
+        let nursery = new Nursery(this._scene, 15, 15);
         this._groundCoverTypes = [];
         this._groundCoverTypes.push(this._createGroundCover());
         this._groundCoverTypes.push(this._createGroundCover());
@@ -605,14 +578,10 @@ class Scenery {
                 let scale = cell.vegetation / this._treeScale;
                 let tree;
                 if (cell.vegetation > 80) {
-                    let treeTypeIndex = Math.round(Math.random() * (this._treeTypes.length - 1));
-                    //console.log(treeTypeIndex, this._treeTypes.length);
-                    tree = this._treeTypes[treeTypeIndex].clone(this._treeTypes[treeTypeIndex].name + "_" + x + "_" + y);
+                    tree = nursery.getTree(x, y);
                 }
                 else if (cell.vegetation > 50) {
-                    let shrubTypes = this._shrubTypes.length;
-                    let shrubTypeIndex = Math.round(Math.random() * (this._shrubTypes.length - 1));
-                    tree = this._shrubTypes[shrubTypeIndex].clone(this._shrubTypes[shrubTypeIndex].name + "_" + x + "_" + y);
+                    tree = nursery.getShrub(x, y);
                 }
                 if (tree !== undefined) {
                     let jitterX = Math.round(Math.random() * 8 - 4);
@@ -705,8 +674,7 @@ class Scenery {
           }
         }*/
         // Don't need the prototypes any more so delete them.
-        this._treeTypes.forEach((node) => { node.dispose(); });
-        this._shrubTypes.forEach((node) => { node.dispose(); });
+        nursery.dispose();
         console.log("Consolidating trees.");
         this._consolidateTrees(trees);
     }
@@ -816,62 +784,6 @@ class Scenery {
             this._scene.meshes.length.toString(), "background: orange; color: white");
         console.log("Tree component count after _consolidateTrees: %c" +
             countFinal.toString(), "background: orange; color: white");
-    }
-    _createTree() {
-        if (Math.random() > 0.2) {
-            return this._createTreeDeciduous();
-        }
-        return this._createTreePine();
-    }
-    _createTreePine() {
-        let canopies = Math.round(Math.random() * 3) + 4;
-        let height = Math.round(Math.random() * 20) + 20;
-        let width = 5;
-        let trunkMaterial = new BABYLON.StandardMaterial("trunk", this._scene);
-        trunkMaterial.diffuseColor = new BABYLON.Color3(0.3 + Math.random() * 0.2, 0.2 + Math.random() * 0.2, 0.2 + Math.random() * 0.1);
-        trunkMaterial.specularColor = BABYLON.Color3.Black();
-        let leafMaterial = new BABYLON.StandardMaterial("leaf", this._scene);
-        leafMaterial.diffuseColor = new BABYLON.Color3(0.4 + Math.random() * 0.2, 0.5 + Math.random() * 0.4, 0.2 + Math.random() * 0.2);
-        leafMaterial.specularColor = BABYLON.Color3.Red();
-        let tree = PineGenerator(canopies, height, width, trunkMaterial, leafMaterial, this._scene);
-        tree.setEnabled(false);
-        tree.name += "_" + this._treeSpecies;
-        this._treeSpecies++;
-        return tree;
-    }
-    _createTreeDeciduous() {
-        let sizeBranch = 15 + Math.random() * 5;
-        let sizeTrunk = 10 + Math.random() * 5;
-        let radius = 1 + Math.random() * 4;
-        let trunkMaterial = new BABYLON.StandardMaterial("trunk", this._scene);
-        trunkMaterial.diffuseColor = new BABYLON.Color3(0.3 + Math.random() * 0.3, 0.2 + Math.random() * 0.3, 0.2 + Math.random() * 0.2);
-        trunkMaterial.specularColor = BABYLON.Color3.Black();
-        let leafMaterial = new BABYLON.StandardMaterial("leaf", this._scene);
-        leafMaterial.diffuseColor = new BABYLON.Color3(0.4 + Math.random() * 0.2, 0.5 + Math.random() * 0.4, 0.2 + Math.random() * 0.2);
-        leafMaterial.specularColor = BABYLON.Color3.Red();
-        let tree = QuickTreeGenerator(sizeBranch, sizeTrunk, radius, trunkMaterial, leafMaterial, this._scene);
-        tree.setEnabled(false);
-        tree.name += "_" + this._treeSpecies;
-        this._treeSpecies++;
-        return tree;
-    }
-    _createShrub(forceSapling) {
-        if (Math.random() < 0.1 || forceSapling) {
-            let sapling = this._createTree();
-            sapling.scaling.x *= 0.2;
-            sapling.scaling.y *= 0.2;
-            sapling.scaling.z *= 0.2;
-            return sapling;
-        }
-        let sizeBranch = 10 + Math.random() * 20;
-        let leafMaterial = new BABYLON.StandardMaterial("leaf", this._scene);
-        leafMaterial.diffuseColor = new BABYLON.Color3(0.4 + Math.random() * 0.2, 0.5 + Math.random() * 0.4, 0.2 + Math.random() * 0.2);
-        leafMaterial.specularColor = BABYLON.Color3.Gray();
-        let tree = QuickShrub(sizeBranch, leafMaterial, this._scene);
-        tree.setEnabled(false);
-        tree.name += "_" + this._treeSpecies;
-        this._treeSpecies++;
-        return tree;
     }
     _createGroundCover() {
         let flowers = [
@@ -1222,7 +1134,7 @@ window.addEventListener('DOMContentLoaded', () => {
 });
 
 },{}],2:[function(require,module,exports){
-class TreeFactory {
+class Nursery {
     constructor(scene, treeTypes, shrubTypes) {
         this._scene = scene;
         this.treeTypes = treeTypes;
@@ -1254,6 +1166,20 @@ class TreeFactory {
         for (let i = this.shrubs.length; i < this.shrubTypes; i++) {
             this._createShrub();
         }
+    }
+    dispose() {
+        this.trees.forEach((tree) => { tree.dispose(); });
+        this.shrubs.forEach((shrub) => { shrub.dispose(); });
+    }
+    getTree(x, y) {
+        let treeTypeIndex = Math.round(Math.random() * (this.trees.length - 1));
+        let species = this.trees[treeTypeIndex];
+        return species.clone(species.name + "_" + x + "_" + y);
+    }
+    getShrub(x, y) {
+        let shrubTypeIndex = Math.round(Math.random() * (this.shrubs.length - 1));
+        let species = this.shrubs[shrubTypeIndex];
+        return species.clone(species.name + "_" + x + "_" + y);
     }
     _createTree(hint) {
         if (!hint) {

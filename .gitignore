@@ -1,3 +1,4 @@
 node_modules/
 src/3rdParty/
+package-lock.json
 *.swp

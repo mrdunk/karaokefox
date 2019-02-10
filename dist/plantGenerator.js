@@ -1,4 +1,4 @@
-class TreeFactory {
+class Nursery {
     constructor(scene, treeTypes, shrubTypes) {
         this._scene = scene;
         this.treeTypes = treeTypes;
@@ -30,6 +30,20 @@ class TreeFactory {
         for (let i = this.shrubs.length; i < this.shrubTypes; i++) {
             this._createShrub();
         }
+    }
+    dispose() {
+        this.trees.forEach((tree) => { tree.dispose(); });
+        this.shrubs.forEach((shrub) => { shrub.dispose(); });
+    }
+    getTree(x, y) {
+        let treeTypeIndex = Math.round(Math.random() * (this.trees.length - 1));
+        let species = this.trees[treeTypeIndex];
+        return species.clone(species.name + "_" + x + "_" + y);
+    }
+    getShrub(x, y) {
+        let shrubTypeIndex = Math.round(Math.random() * (this.shrubs.length - 1));
+        let species = this.shrubs[shrubTypeIndex];
+        return species.clone(species.name + "_" + x + "_" + y);
     }
     _createTree(hint) {
         if (!hint) {
